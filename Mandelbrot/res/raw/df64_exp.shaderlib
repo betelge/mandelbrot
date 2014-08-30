@@ -1,0 +1,60 @@
+// Double float 64 bit emulation shader library
+
+vec2 split(float a) {
+	const float split = 4097; // ( 1 << 12 ) + 1 ;
+	
+	float t = a*split;
+	float a_hi = t-(t-a);
+	float a_lo = a - a_hi;
+	
+	return vec2(a_hi, a_lo);
+}
+
+vec4 split2(vec2 a) {
+	const float split = 4097; // ( 1 << 12 ) + 1 ;
+	
+	vec2 t = a*split;
+	vec2 a_hi = t-(t-a);
+	vec2 a_lo = a - a_hi;
+	
+	return vec4(a_hi.x, a_lo.x, a_hi.y, a_lo.y);
+}
+
+vec2 twoProd(float a, float b) {
+	float p = a∗b ;
+	vec2 aS = split(a);
+	vec2 bS = split(b);
+	float err = ((aS.x∗bS.x−p) + aS.x∗bS.y + aS.y∗bS.x)	+ aS.y∗bS.y;
+	return vec2(p, err );
+}
+
+float2 df64mult (float2 a, float2 b) {
+	float2 p;
+	p = twoProd(a.x, b.x) ;
+	p.y += a.x∗b.y;
+	p.y += a.y∗b.x;
+	p = quickTwoSum(p.x, p.y);
+	return p ;
+}
+
+f l o a t 2 quickTwoSum ( f l o a t a , f l o a t b ) {
+float s = a + b;
+float e = b − ( s − a );
+return f l o a t 2 ( s , e ) ;
+}
+f l o a t 2 twoSum ( f l o a t a , f l o a t b ) {
+float s = a + b;
+float v = s − a ;
+float e = (a − ( s − v )) + (b − v );
+return f l o a t 2 ( s , e ) ;
+}
+float2 df64 add ( float2 a , float2 b ) {
+float2 s , t ;
+s = twoSum ( a . x , b . x ) ;
+t = twoSum ( a . y , b . y ) ;
+s . y += t . x ;
+s = quickTwoSum ( s . x , s . y ) ;
+s . y += t . y ;
+s = quickTwoSum ( s . x , s . y ) ;
+return s ;
+}

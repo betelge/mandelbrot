@@ -1,0 +1,31 @@
+precision mediump float;
+
+uniform float MAX_ITER;
+
+varying vec2 c;
+
+vec2 iter(vec2 z)
+{
+	return vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + 2.0*c;
+}
+
+void main()
+{
+
+	// (c.x, x.y, iteration)
+	vec2 z = vec2(0.0, 0.0);
+	
+	/*while( z.x*z.x + z.y*z.y < 4.0 && z.z < MAX_ITER)
+		z = iter(z);*/
+		
+	int i;
+	int max = int(MAX_ITER);
+	for( i=0; i<max; i++ ) {
+		if(z.x*z.x + z.y*z.y > 4.0) break;
+		z = iter(z);
+	}
+	
+	float speed2 = (i == max ? 0.0 : float(i)) / MAX_ITER;
+	
+	gl_FragColor = vec4(speed2, speed2, 0.5, 1.0);
+}
