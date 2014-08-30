@@ -1,0 +1,52 @@
+precision mediump float;
+
+uniform float MAX_ITER;
+uniform vec2 scale;
+uniform vec2 offset;
+
+varying vec2 pos;
+
+const float split = 513.;//4097.0;//8193.;
+
+vec2 ds_mul(vec2 dsa, vec2 dsb);
+
+vec2 splitf(float a)
+{
+float t, hi;
+ t = split * a;
+ hi = t - (t-a);
+ return vec2(hi, a-hi);
+}
+
+void main()
+{
+	vec2 c;
+	c = ds_mul(splitf(scale.x), splitf(pos.x));
+	gl_FragColor = vec4(c/split, 0.5, 1.0);
+}
+
+vec2 ds_mul(vec2 dsa, vec2 dsb) {
+	vec2 dsc;
+	float c11, c21, c2, e, t1, t2;
+	float a1, a2, b1, b2, cona, conb, split = 8193.;
+ 
+	cona = dsa.x * split;
+	conb = dsb.x * split;
+	a1 = cona - (cona - dsa.x);
+	b1 = conb - (conb - dsb.x);
+	a2 = dsa.x - a1;
+	b2 = dsb.x - b1;
+	c11 = dsa.x * dsb.x;
+	c21 = a2 * b2 + (a2 * b1 + (a1 * b2 + (a1 * b1 - c11)));
+	 
+	c2 = dsa.x * dsb.y + dsa.y * dsb.x;
+	 
+	t1 = c11 + c2;
+	e = t1 - c11;
+	t2 = dsa.y * dsb.y + ((c2 - e) + (c11 - (t1 - e))) + c21;
+	 
+	dsc.x = t1 + t2;
+	dsc.y = t2 - (dsc.x - t1);
+	 
+	return dsc;
+}

@@ -1,0 +1,175 @@
+precision mediump float;
+
+uniform float MAX_ITER;
+uniform vec2 scale;
+uniform vec2 offset;
+
+uniform float split;
+
+varying vec2 pos;
+
+vec4 c;
+
+//const float split = 1025.;
+
+vec2 splitf(float a)
+{
+float t, hi;
+ t = split * a;
+ hi = t - (t-a);
+ return vec2(hi, a-hi);
+}
+
+vec2 dsc;
+float t1, t2, e;
+
+/*vec2 ds_add (vec2 dsa, vec2 dsb) {
+	vec2 dsc;
+	float t1, t2, e;
+ 
+	t1 = dsa.x + dsb.x;
+	e = t1 - dsa.x;
+	t2 = ((dsb.x - e) + (dsa.x - (t1 - e))) + dsa.y + dsb.y;
+ 
+	dsc.x = t1 + t2;
+	dsc.y = t2 - (dsc.x - t1);
+	return dsc;
+}*/
+
+vec2 ds_add(vec2 dsa, vec2 dsb) {
+	
+ 
+	t1 = dsa.x + dsb.x;
+	e = t1 - dsa.x;
+	//t2 = ((dsb.x - e) + (dsa.x - (t1 - e))) + dsa.y + dsb.y;
+	
+	t2 = (t1 - e);
+	t2 = dsa.x - t2;
+	t2 += (dsb.x - e);
+	t2 += dsa.y + dsb.y;
+ 
+	dsc.x = t1 + t2;
+	dsc.y = t2 - (dsc.x - t1);
+	return dsc;
+}
+
+float c11, c21, c2;
+float a1, a2, b1, b2, cona, conb;
+
+/*vec2 ds_mul (vec2 dsa, vec2 dsb) {
+	vec2 dsc;
+	float c11, c21, c2, e, t1, t2;
+	float a1, a2, b1, b2, cona, conb;
+ 
+	cona = dsa.x * split;
+	conb = dsb.x * split;
+	a1 = cona - (cona - dsa.x);
+	b1 = conb - (conb - dsb.x);
+	a2 = dsa.x - a1;
+	b2 = dsb.x - b1;
+	c11 = dsa.x * dsb.x;
+	c21 = a2 * b2 + (a2 * b1 + (a1 * b2 + (a1 * b1 - c11)));
+	 
+	c2 = dsa.x * dsb.y + dsa.y * dsb.x;
+	 
+	t1 = c11 + c2;
+	e = t1 - c11;
+	t2 = dsa.y * dsb.y + ((c2 - e) + (c11 - (t1 - e))) + c21;
+	 
+	dsc.x = t1 + t2;
+	dsc.y = t2 - (dsc.x - t1);
+	 
+	return dsc;
+}*/
+
+vec2 ds_mul(vec2 dsa, vec2 dsb) {
+	
+	cona = dsa.x * split;
+	conb = dsb.x * split;
+	a1 = - (cona - dsa.x);
+	a1 += cona;
+	b1 = - (conb - dsb.x);
+	b1 += conb;
+	a2 = dsa.x - a1;
+	b2 = dsb.x - b1;
+	c11 = dsa.x * dsb.x;
+	//c21 = a2 * b2 + (a2 * b1 + (a1 * b2 + (a1 * b1 - c11)));
+	
+	c21 = a1 * b1 - c11;
+	c21 += a1 * b2;
+	c21 += a2 * b1;
+	c21 += a2 * b2;
+	 
+	c2 = dsa.x * dsb.y + dsa.y * dsb.x;
+	 
+	t1 = c11 + c2;
+	e = t1 - c11;
+	//t2 = dsa.y * dsb.y + ((c2 - e) + (c11 - (t1 - e))) + c21;
+	
+	t2 = t1 -e;
+	t2 = c11 - t2;
+	t2 += (c2 - e);
+	t2 += dsa.y * dsb.y;
+	t2 += c21;
+	 
+	dsc.x = t1 + t2;
+	dsc.y = t2 - (dsc.x - t1);
+	 
+	return dsc;
+}
+
+vec2 imag;
+vec4 result;
+vec4 iter(vec4 z)
+{
+	//return vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + 2.0*c;
+	
+	
+	imag = ds_mul(z.xy, z.zw);
+	imag = ds_add(imag, imag);
+	result = vec4(ds_add(ds_mul(z.xy, z.xy), -ds_mul(z.zw, z.zw)), imag);
+	
+	result.xy = ds_add(result.xy, c.xy);
+	result.zw = ds_add(result.zw, c.zw);
+	
+	return result;
+}
+
+void main()
+{
+	// Calculate c
+	
+	vec2 posX = /*vec2(pos.x,0.);*/splitf(pos.x);
+	vec2 posY = /*vec2(pos.y,0.);*/splitf(pos.y);
+	
+	vec2 scaX = /*vec2(scale.x,0.);*/splitf(scale.x);
+	vec2 scaY = /*vec2(scale.y,0.);*/splitf(scale.y);
+	
+	vec2 offX = /*vec2(2.0*offset.x,0.);*/splitf(2.0*offset.x);
+	vec2 offY = /*vec2(2.0*offset.y,0.);*/splitf(2.0*offset.y);
+	
+	vec2 real = ds_mul(scaX, posX);
+	real = ds_add(real,real);
+	real = ds_add(real, /*ds_add( real, */offX/*)*/);
+	
+	vec2 imag = ds_mul(scaY, posY);
+	imag = ds_add(imag,imag);
+	imag = ds_add(imag, /*ds_add(imag, */offY/*)*/);
+	
+	c = vec4(real, imag);
+
+	vec4 z = vec4(0.0);
+
+	int i;
+	int max = int(MAX_ITER);
+	vec2 radius2;
+	for( i=0; i<max; i++ ) {
+		radius2 = ds_add(ds_mul(z.xy,z.xy), ds_mul(z.zw,z.zw));
+		if( radius2.x > 4.0) break;
+		z = iter(z);
+	}
+	
+	float speed2 = (i == max ? 0.0 : float(i)) / MAX_ITER;
+	
+	gl_FragColor = vec4(speed2, speed2, 0.5, 1.0);
+}

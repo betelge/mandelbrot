@@ -1,0 +1,13 @@
+
+attribute vec3 position;
+
+uniform vec2 scale;
+uniform vec2 offset;
+
+varying vec2 c;
+
+void main(void)
+{
+	c = scale*position.xy + offset;
+	gl_Position = vec4(position, 1.0);
+}

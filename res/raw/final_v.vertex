@@ -1,0 +1,14 @@
+
+attribute vec3 position;
+attribute vec2 textureCoord;
+
+uniform vec2 offset;
+uniform vec2 scale;
+
+varying vec2 tc;
+
+void main(void)
+{
+	tc = textureCoord; //scale*textureCoord + 0.5*offset;
+	gl_Position = vec4(position.xy/scale - offset, position.z, 1.0);
+}
