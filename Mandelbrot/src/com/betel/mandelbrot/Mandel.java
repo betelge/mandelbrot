@@ -34,6 +34,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.EditText;
+import android.widget.NumberPicker;
 
 public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayoutChangeListener {
 	
@@ -87,7 +88,7 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		mandel64ShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel64_v, R.raw.mandel64_f);
 		mandelMaterial = new Material(mandelShaderProg);
 		
-		maxInterationsUniform = new Uniform("MAX_ITER", 50f);
+		maxInterationsUniform = new Uniform("MAX_ITER", 40f);
 		mandelMaterial.addUniform(maxInterationsUniform);
 		
 		offsetMandelUniform = new Uniform("offset", offsetMandelX, offsetMandelY);
@@ -124,10 +125,7 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		// automatically handle clicks on the Home/Up button, so long
 		// as you specify a parent activity in AndroidManifest.xml.
 		int id = item.getItemId();
-		if (id == R.id.action_settings) {
-			return true;
-		}
-		if(item.getItemId() == R.id.emulateDoubleCheckBox) {
+		if(id == R.id.emulateDoubleCheckBox) {
 			if( item.isChecked()) {
 	            mandelMaterial.setShaderProgram(mandelShaderProg);
 	            item.setChecked(false);
@@ -139,10 +137,43 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 			mandelPass.setSilent(false);
 			return true;
 		}
-		if(item.getItemId() == R.id.chooseMaxIter) {
+		if(id == R.id.chooseMaxIter) {
+			maxIterDialog = new AlertDialog.Builder(this);
+			maxIterDialog.setTitle("Title");
+			maxIterDialog.setMessage("Message");
+			// Set an EditText view to get user input 
+			final NumberPicker input = new NumberPicker(this);
+			input.setMinValue(0);
+			input.setMaxValue(1000);
+			input.setValue((int)maxInterationsUniform.getFloats()[0]);
+			maxIterDialog.setView(input);
+			maxIterDialog.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+			public void onClick(DialogInterface dialog, int whichButton) {
+			  	int value = input.getValue();
+			  	maxInterationsUniform.set((float)value);
+			  	mandelPass.setSilent(false);
+			  }
+			});
 			maxIterDialog.show();
 		}
-		if(item.getItemId() == R.id.chooseSplitter) {
+		if(id == R.id.chooseSplitter) {
+			
+			splitFloatDialog = new AlertDialog.Builder(this);
+			splitFloatDialog.setTitle("Title");
+			splitFloatDialog.setMessage("Message");
+			// Set an EditText view to get user input 
+			final NumberPicker input2 = new NumberPicker(this);
+			input2.setMinValue(0);
+			input2.setMaxValue(1<<14 + 1);
+			input2.setValue((int)splitterFloatUniform.getFloats()[0]);
+			splitFloatDialog.setView(input2);
+			splitFloatDialog.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+			public void onClick(DialogInterface dialog, int whichButton) {
+			  	int value = input2.getValue();
+			  	splitterFloatUniform.set((float)value);
+			  	mandelPass.setSilent(false);
+			  }
+			});
 			splitFloatDialog.show();
 		}
 		return super.onOptionsItemSelected(item);
@@ -271,38 +302,9 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		model.addRenderPass(mandelPass);
 		finalPass = new QuadRenderPass(finalMaterial);
 		model.addRenderPass(finalPass);
-		model.addRenderPass(new CheckGlErrorPass(true));
+		model.addRenderPass(new CheckGlErrorPass(true));		
 		
-		// Redo the dialogs when they need a new parent
-		maxIterDialog = new AlertDialog.Builder(this);
-		maxIterDialog.setTitle("Title");
-		maxIterDialog.setMessage("Message");
-		// Set an EditText view to get user input 
-		final EditText input = new EditText(this);
-		maxIterDialog.setView(input);
-		maxIterDialog.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-		public void onClick(DialogInterface dialog, int whichButton) {
-		  Editable text = input.getText();
-		  	int value = Integer.parseInt(text.toString());
-		  	maxInterationsUniform.set((float)value);
-		  	mandelPass.setSilent(false);
-		  }
-		});
 		
-		splitFloatDialog = new AlertDialog.Builder(this);
-		splitFloatDialog.setTitle("Title");
-		splitFloatDialog.setMessage("Message");
-		// Set an EditText view to get user input 
-		final EditText input2 = new EditText(this);
-		splitFloatDialog.setView(input2);
-		splitFloatDialog.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-		public void onClick(DialogInterface dialog, int whichButton) {
-		  Editable text = input2.getText();
-		  	int value = Integer.parseInt(text.toString());
-		  	splitterFloatUniform.set((float)value);
-		  	mandelPass.setSilent(false);
-		  }
-		});
 	}
 
 }
