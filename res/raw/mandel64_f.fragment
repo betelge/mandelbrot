@@ -20,10 +20,10 @@ float t, hi;
  return vec2(hi, a-hi);
 }
 
-vec2 dsc;
-float t1, t2, e;
+//vec2 dsc;
+//float t1, t2, e;
 
-/*vec2 ds_add (vec2 dsa, vec2 dsb) {
+vec2 ds_add (vec2 dsa, vec2 dsb) {
 	vec2 dsc;
 	float t1, t2, e;
  
@@ -34,9 +34,9 @@ float t1, t2, e;
 	dsc.x = t1 + t2;
 	dsc.y = t2 - (dsc.x - t1);
 	return dsc;
-}*/
+}
 
-vec2 ds_add(vec2 dsa, vec2 dsb) {
+/*vec2 ds_add(vec2 dsa, vec2 dsb) {
 	
  
 	t1 = dsa.x + dsb.x;
@@ -51,12 +51,12 @@ vec2 ds_add(vec2 dsa, vec2 dsb) {
 	dsc.x = t1 + t2;
 	dsc.y = t2 - (dsc.x - t1);
 	return dsc;
-}
+}*/
 
-float c11, c21, c2;
-float a1, a2, b1, b2, cona, conb;
+//float c11, c21, c2;
+//float a1, a2, b1, b2, cona, conb;
 
-/*vec2 ds_mul (vec2 dsa, vec2 dsb) {
+vec2 ds_mul (vec2 dsa, vec2 dsb) {
 	vec2 dsc;
 	float c11, c21, c2, e, t1, t2;
 	float a1, a2, b1, b2, cona, conb;
@@ -80,9 +80,9 @@ float a1, a2, b1, b2, cona, conb;
 	dsc.y = t2 - (dsc.x - t1);
 	 
 	return dsc;
-}*/
+}
 
-vec2 ds_mul(vec2 dsa, vec2 dsb) {
+/*vec2 ds_mul(vec2 dsa, vec2 dsb) {
 	
 	cona = dsa.x * split;
 	conb = dsb.x * split;
@@ -116,7 +116,7 @@ vec2 ds_mul(vec2 dsa, vec2 dsb) {
 	dsc.y = t2 - (dsc.x - t1);
 	 
 	return dsc;
-}
+}*/
 
 vec2 imag;
 vec4 result;
