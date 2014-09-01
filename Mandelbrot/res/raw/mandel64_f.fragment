@@ -169,7 +169,7 @@ void main()
 		z = iter(z);
 	}
 	
-	float speed2 = (i == max ? 0.0 : float(i)) / MAX_ITER;
+	float speed2 = (i == max ? 0.0 : float(i)) / 40.; //MAX_ITER;
 	
 	gl_FragColor = vec4(speed2, speed2, 0.5, 1.0);
 }

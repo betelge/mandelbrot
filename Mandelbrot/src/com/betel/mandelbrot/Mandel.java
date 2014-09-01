@@ -139,8 +139,8 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		}
 		if(id == R.id.chooseMaxIter) {
 			maxIterDialog = new AlertDialog.Builder(this);
-			maxIterDialog.setTitle("Title");
-			maxIterDialog.setMessage("Message");
+			maxIterDialog.setTitle("Maximum iteration");
+			maxIterDialog.setMessage("Set a value");
 			// Set an EditText view to get user input 
 			final NumberPicker input = new NumberPicker(this);
 			input.setMinValue(0);
@@ -159,8 +159,8 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		if(id == R.id.chooseSplitter) {
 			
 			splitFloatDialog = new AlertDialog.Builder(this);
-			splitFloatDialog.setTitle("Title");
-			splitFloatDialog.setMessage("Message");
+			splitFloatDialog.setTitle("Float splitter");
+			splitFloatDialog.setMessage("Set a value");
 			// Set an EditText view to get user input 
 			final NumberPicker input2 = new NumberPicker(this);
 			input2.setMinValue(0);
