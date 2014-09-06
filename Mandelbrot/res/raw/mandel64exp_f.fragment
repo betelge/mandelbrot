@@ -1,0 +1,241 @@
+#version 100
+
+#pragma optionNV(fastmath off)
+#pragma optionNV(fastprecision off)
+
+precision mediump float;
+
+uniform float MAX_ITER;
+uniform vec2 scale;
+uniform vec2 offset;
+
+uniform float split;
+
+varying vec2 pos;
+
+vec4 c;
+
+vec2 splitf(float a)
+{
+float t, hi;
+ t = split * a;
+ hi = t - (t-a);
+ return vec2(hi, a-hi);
+}
+
+vec2 add (vec2 dsa, vec2 dsb);
+vec2 sub (vec2 dsa, vec2 dsb);
+vec2 mul (vec2 dsa, vec2 dsb);
+
+vec2 imag;
+vec4 result;
+vec4 iter(vec4 z)
+{
+	//return vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + 2.0*c;
+	
+	
+	imag = mul(z.xy, z.zw);
+	imag = add(imag, imag);
+	result = vec4(sub(mul(z.xy, z.xy), mul(z.zw, z.zw)), imag);
+	
+	result.xy = add(result.xy, c.xy);
+	result.zw = add(result.zw, c.zw);
+	
+	return result;
+}
+
+void main()
+{
+	// Calculate c
+	
+	vec2 posX = /*vec2(pos.x,0.);*/splitf(pos.x);
+	vec2 posY = /*vec2(pos.y,0.);*/splitf(pos.y);
+	
+	vec2 scaX = /*vec2(scale.x,0.);*/splitf(scale.x);
+	vec2 scaY = /*vec2(scale.y,0.);*/splitf(scale.y);
+	
+	vec2 offX = /*vec2(2.0*offset.x,0.);*/splitf(2.0*offset.x);
+	vec2 offY = /*vec2(2.0*offset.y,0.);*/splitf(2.0*offset.y);
+	
+	vec2 real = mul(scaX, posX);
+	real = add(real, offX);
+	
+	vec2 imag = mul(scaY, posY);
+	imag = add(imag, offY);
+	
+	c = vec4(real, imag);
+
+	vec4 z = vec4(0.0);
+
+	int i;
+	int max = int(MAX_ITER);
+	vec2 radius2;
+	for( i=0; i<max; i++ ) {
+		radius2 = add(mul(z.xy,z.xy), mul(z.zw,z.zw));
+		if( radius2.x > 4.0) break;
+		z = iter(z);
+	}
+	
+	float speed2 = (i == max ? 0.0 : float(i)) / MAX_ITER;
+		
+	gl_FragColor = vec4(speed2, speed2, 0., 1.0);
+}
+
+// Double emulation based on GLSL Mandelbrot Shader by Henry Thasler (www.thasler.org/blog)
+//
+// Emulation based on Fortran-90 double-single package. See http://crd.lbl.gov/~dhbailey/mpdist/
+// Add: res = ds_add(a, b) => res = a + b
+vec2 add (vec2 dsa, vec2 dsb)
+{
+	vec2 dsc;
+	float t1, t2, e;
+	
+	t1 = dsa.x + dsb.x;
+	e = t1 - dsa.x;
+	t2 = ((dsb.x - e) + (dsa.x - (t1 - e))) + dsa.y + dsb.y;
+	
+	dsc.x = t1 + t2;
+	dsc.y = t2 - (dsc.x - t1);
+	return dsc;
+}
+
+// Subtract: res = ds_sub(a, b) => res = a - b
+vec2 sub (vec2 dsa, vec2 dsb)
+{
+	vec2 dsc;
+	float e, t1, t2;
+	
+	t1 = dsa.x - dsb.x;
+	e = t1 - dsa.x;
+	t2 = ((-dsb.x - e) + (dsa.x - (t1 - e))) + dsa.y - dsb.y;
+	
+	dsc.x = t1 + t2;
+	dsc.y = t2 - (dsc.x - t1);
+	return dsc;
+}
+
+// Compare: res = -1 if a < b
+//              = 0 if a == b
+//              = 1 if a > b
+float cmp(vec2 dsa, vec2 dsb)
+{
+	if (dsa.x < dsb.x) return -1.;
+	else if (dsa.x == dsb.x)
+	{
+		if (dsa.y < dsb.y) return -1.;
+		else if (dsa.y == dsb.y) return 0.;
+		else return 1.;
+	}
+	else return 1.;
+}
+
+// Multiply: res = ds_mul(a, b) => res = a * b
+vec2 mul (vec2 dsa, vec2 dsb)
+{
+	vec2 dsc;
+	float c11, c21, c2, e, t1, t2;
+	float a1, a2, b1, b2, cona, conb;
+	
+	cona = dsa.x * split;
+	conb = dsb.x * split;
+	a1 = cona - (cona - dsa.x);
+	b1 = conb - (conb - dsb.x);
+	a2 = dsa.x - a1;
+	b2 = dsb.x - b1;
+	
+	c11 = dsa.x * dsb.x;
+	c21 = a2 * b2 + (a2 * b1 + (a1 * b2 + (a1 * b1 - c11)));
+	
+	c2 = dsa.x * dsb.y + dsa.y * dsb.x;
+	
+	t1 = c11 + c2;
+	e = t1 - c11;
+	t2 = dsa.y * dsb.y + ((c2 - e) + (c11 - (t1 - e))) + c21;
+	
+	dsc.x = t1 + t2;
+	dsc.y = t2 - (dsc.x - t1);
+	
+	return dsc;
+}
+
+// Divide: res = ds_div(a, b) => res = a / b
+vec2 div (vec2 dsa, vec2 dsb)
+{
+	vec2 dsc;
+	float a1, a2, b1, b2, cona, conb;
+	float c11, c21, c2, e, t1, t2, s1, s2;
+	float t11, t12, t21, t22;
+	
+	s1 = dsa.x / dsb.x;
+	cona = s1 * split;
+	conb = dsb.x * split;
+	a1 = cona - (cona - s1);
+	b1 = conb - (conb - dsb.x);
+	a2 = s1 - a1;
+	b2 = dsb.x - b1;
+	
+	c11 = s1 * dsb.x;
+	c21 = (((a1 * b1 - c11) + a1 * b2) + a2 * b1) + a2 * b2;
+	
+	c2 = s1 * dsb.y;
+	
+	t1 = c11 + c2;
+	e = t1 - c11;
+	t2 = ((c2 - e) + (c11 - (t1 - e))) + c21;
+	
+	t12 = t1 + t2;
+	t22 = t2 - (t12 - t1);
+	
+	t11 = dsa.x - t12;
+	e = t11 - dsa.x;
+	t21 = ((-t12 - e) + (dsa.x - (t11 - e))) + dsa.y - t22;
+	
+	s2 = (t11 + t21) / dsb.x;
+	
+	dsc.x = s1 + s2;
+	dsc.y = s2 - (dsc.x - s1);
+	
+	return dsc;
+}
+
+// create double-single number from float
+vec2 set(float a)
+{
+	vec2 z;
+	z.x = a;
+	z.y = 0.0;
+	return z;
+}
+
+
+// double complex multiplication
+vec4 dcMul(vec4 a, vec4 b) {
+	return vec4( sub(mul(a.xy,b.xy),mul(a.zw,b.zw))
+		,add(mul(a.xy,b.zw),mul(a.zw,b.xy)));
+}
+
+// double complex square
+
+vec4 dcSqr(vec4 a) {
+	// we need a scalar*double function to be optimal here!
+	return vec4( sub(mul(a.xy,a.xy),mul(a.zw,a.zw))
+		,mul(mul(a.xy,a.zw),vec2(2.0,0.0)));
+}
+
+vec4 dcAdd(vec4 a, vec4 b) {
+	return vec4(add(a.xy,b.xy),add(a.zw,b.zw));
+}
+
+// Square Length of double complex
+vec2 dcSqrLength(vec4 a) {
+	return add(mul(a.xy,a.xy),mul(a.zw,a.zw));
+}
+
+vec4 dcSet(vec2 a) {
+	return vec4(a.x,0.,a.y,0.);
+}
+
+// Multiply double-complex with double
+vec4 dcMul(vec4 a, vec2 b) {
+	return vec4(mul(a.xy,b),mul(a.wz,b));
+}

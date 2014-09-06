@@ -6,7 +6,7 @@ varying vec2 c;
 
 vec2 iter(vec2 z)
 {
-	return vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + 2.0*c;
+	return vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
 }
 
 void main()
