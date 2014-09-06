@@ -8,6 +8,6 @@ varying vec2 c;
 
 void main(void)
 {
-	c = scale*position.xy + offset;
+	c = 2.*(scale*position.xy + offset);
 	gl_Position = vec4(position, 1.0);
 }

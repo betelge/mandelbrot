@@ -3,8 +3,10 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="com.betel.mandelbrot.Mandel" >
 
-    <item android:id="@+id/emulateDoubleCheckBox" android:checkable="true" android:checked="false" android:menuCategory="alternative" android:title="Emulate double precision" android:enabled="true" android:visible="true"/>
-    <item android:id="@+id/chooseMaxIter" android:menuCategory="alternative" android:title="Choose maximum iteration"/>
-    <item android:id="@+id/chooseSplitter" android:menuCategory="alternative" android:title="Choose splitter float"/>
+    <item android:id="@+id/emulateDoubleCheckBox" android:checkable="true" android:checked="false" android:title="Emulate double precision" android:enabled="true" android:visible="true" android:orderInCategory="10"/>
+    <item android:id="@+id/experimentalShader" android:checked="false" android:visible="true" android:checkable="true" android:enabled="true" android:title="Use experimental 64 bit shader" android:orderInCategory="20"></item>
+    <item android:id="@+id/chooseMaxIter" android:title="Choose maximum iteration" android:orderInCategory="30"/>
+    <item android:id="@+id/chooseSplitter" android:title="Choose splitter float" android:orderInCategory="40"/>
+    
 
 </menu>

@@ -48,6 +48,7 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 	private Material mandelMaterial;
 	private ShaderProgram mandelShaderProg;
 	private ShaderProgram mandel64ShaderProg;
+	private ShaderProgram mandel64ExpShaderProg;
 	private float scaleMandelX = 1f, scaleMandelY = 1f;
 	private float offsetMandelX = 0f, offsetMandelY = 0f;
 	private Uniform scaleMandelUniform;
@@ -86,6 +87,7 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		
 		mandelShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel_v, R.raw.mandel_f);
 		mandel64ShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel64_v, R.raw.mandel64_f);
+		mandel64ExpShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel64exp_v, R.raw.mandel64exp_f);
 		mandelMaterial = new Material(mandelShaderProg);
 		
 		maxInterationsUniform = new Uniform("MAX_ITER", 40f);
@@ -125,13 +127,25 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		// automatically handle clicks on the Home/Up button, so long
 		// as you specify a parent activity in AndroidManifest.xml.
 		int id = item.getItemId();
-		if(id == R.id.emulateDoubleCheckBox) {
+		if(id == R.id.emulateDoubleCheckBox) {			
 			if( item.isChecked()) {
 	            mandelMaterial.setShaderProgram(mandelShaderProg);
 	            item.setChecked(false);
 	        }
 	        else {
 	        	mandelMaterial.setShaderProgram(mandel64ShaderProg);
+	        	item.setChecked(true);
+	        }
+			mandelPass.setSilent(false);
+			return true;
+		}
+		if(id == R.id.experimentalShader) {
+			if(item.isChecked()) {
+				mandelMaterial.setShaderProgram(mandel64ShaderProg);
+	        	item.setChecked(false);
+			}
+			else {
+	        	mandelMaterial.setShaderProgram(mandel64ExpShaderProg);
 	        	item.setChecked(true);
 	        }
 			mandelPass.setSilent(false);

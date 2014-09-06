@@ -149,11 +149,9 @@ void main()
 	vec2 offY = /*vec2(2.0*offset.y,0.);*/splitf(2.0*offset.y);
 	
 	vec2 real = ds_mul(scaX, posX);
-	real = ds_add(real,real);
 	real = ds_add(real, /*ds_add( real, */offX/*)*/);
 	
 	vec2 imag = ds_mul(scaY, posY);
-	imag = ds_add(imag,imag);
 	imag = ds_add(imag, /*ds_add(imag, */offY/*)*/);
 	
 	c = vec4(real, imag);
@@ -169,7 +167,9 @@ void main()
 		z = iter(z);
 	}
 	
-	float speed2 = (i == max ? 0.0 : float(i)) / 40.; //MAX_ITER;
+	float speed2 = (i == max ? 0.0 : float(i)) / MAX_ITER;
+	
+	//speed2 = (40. + 1. - log(log(float(i)))/log(2.));
 	
 	gl_FragColor = vec4(speed2, speed2, 0.5, 1.0);
 }
