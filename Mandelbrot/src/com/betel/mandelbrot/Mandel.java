@@ -50,9 +50,10 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 	private ShaderProgram mandel64ShaderProg;
 	private ShaderProgram mandel64ExpShaderProg;
 	private float scaleMandelX = 1f, scaleMandelY = 1f;
-	private float offsetMandelX = 0f, offsetMandelY = 0f;
+	private double offsetMandelX = 0f, offsetMandelY = 0f;
 	private Uniform scaleMandelUniform;
 	private Uniform offsetMandelUniform;
+	private Uniform offsetFineMandelUniform;
 	
 	RenderPass finalPass;
 	private Material finalMaterial;
@@ -93,8 +94,10 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		maxInterationsUniform = new Uniform("MAX_ITER", 40f);
 		mandelMaterial.addUniform(maxInterationsUniform);
 		
-		offsetMandelUniform = new Uniform("offset", offsetMandelX, offsetMandelY);
+		offsetMandelUniform = new Uniform("offset", (float)offsetMandelX, (float)offsetMandelY);
 		mandelMaterial.addUniform(offsetMandelUniform);
+		offsetFineMandelUniform = new Uniform("offsetFine", 0f, 0f);
+		mandelMaterial.addUniform(offsetFineMandelUniform);
 		scaleMandelUniform = new Uniform("scale", scaleMandelX, scaleMandelY);
 		mandelMaterial.addUniform(scaleMandelUniform);
 		splitterFloatUniform = new Uniform("split", 1025f);
@@ -178,7 +181,7 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 			// Set an EditText view to get user input 
 			final NumberPicker input2 = new NumberPicker(this);
 			input2.setMinValue(0);
-			input2.setMaxValue(1<<14 + 1);
+			input2.setMaxValue(1<<23 + 1);
 			input2.setValue((int)splitterFloatUniform.getFloats()[0]);
 			splitFloatDialog.setView(input2);
 			splitFloatDialog.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
@@ -220,7 +223,9 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 					offsetFinalY = 0f;
 					
 					scaleMandelUniform.set(scaleMandelX, scaleMandelY);
-					offsetMandelUniform.set(offsetMandelX, offsetMandelY);
+					offsetMandelUniform.set((float)offsetMandelX, (float)offsetMandelY);
+					offsetFineMandelUniform.set((float)(offsetMandelX - (float)offsetMandelX),
+							(float)(offsetMandelY - (float)offsetMandelY));
 					
 					scaleFinalUniform.set(scaleFinalX, scaleFinalY);
 					offsetFinalUniform.set(offsetFinalX, offsetFinalY);
