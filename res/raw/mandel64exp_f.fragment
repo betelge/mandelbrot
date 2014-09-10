@@ -8,6 +8,7 @@ precision mediump float;
 uniform float MAX_ITER;
 uniform vec2 scale;
 uniform vec2 offset;
+uniform vec2 offsetFine;
 
 uniform float split;
 
@@ -26,6 +27,8 @@ float t, hi;
 vec2 add (vec2 dsa, vec2 dsb);
 vec2 sub (vec2 dsa, vec2 dsb);
 vec2 mul (vec2 dsa, vec2 dsb);
+
+vec3 hsv2rgb(vec3 c);
 
 vec2 imag;
 vec4 result;
@@ -54,8 +57,8 @@ void main()
 	vec2 scaX = /*vec2(scale.x,0.);*/splitf(scale.x);
 	vec2 scaY = /*vec2(scale.y,0.);*/splitf(scale.y);
 	
-	vec2 offX = /*vec2(2.0*offset.x,0.);*/splitf(2.0*offset.x);
-	vec2 offY = /*vec2(2.0*offset.y,0.);*/splitf(2.0*offset.y);
+	vec2 offX = vec2(2.*offset.x,2.*offsetFine.x);//splitf(2.0*offset.x);
+	vec2 offY = vec2(2.*offset.y,2.*offsetFine.y);//splitf(2.0*offset.y);
 	
 	vec2 real = mul(scaX, posX);
 	real = add(real, offX);
@@ -76,9 +79,13 @@ void main()
 		z = iter(z);
 	}
 	
-	float speed2 = (i == max ? 0.0 : float(i)) / MAX_ITER;
-		
-	gl_FragColor = vec4(speed2, speed2, 0., 1.0);
+	float speed2 = log(float(i) / MAX_ITER);
+	
+	vec3 hsv = vec3(speed2, 1., 1.);
+	
+	if(i == max) hsv.z = 0.;
+	
+	gl_FragColor = vec4(hsv2rgb(hsv), 1.0);
 }
 
 // Double emulation based on GLSL Mandelbrot Shader by Henry Thasler (www.thasler.org/blog)
@@ -238,4 +245,11 @@ vec4 dcSet(vec2 a) {
 // Multiply double-complex with double
 vec4 dcMul(vec4 a, vec2 b) {
 	return vec4(mul(a.xy,b),mul(a.wz,b));
+}
+
+// HSV to RGB
+vec3 hsv2rgb(vec3 c) {
+  vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
