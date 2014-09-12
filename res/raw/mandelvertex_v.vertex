@@ -1,6 +1,7 @@
 
 attribute vec3 position;
 
+uniform mat4 modelViewMatrix;
 uniform vec2 scale;
 uniform vec2 offset;
 
@@ -13,7 +14,9 @@ vec2 iter(vec2 z)
 
 void main(void)
 {
-	vec2 c = 2.*(scale*position.xy + offset);
+	vec4 posit = modelViewMatrix * vec4(position, 1.);
+
+	vec2 c = 2.*(scale*posit.xy + offset);
 
 	vec2 z = vec2(0.0, 0.0);
 	
@@ -26,5 +29,5 @@ void main(void)
 	
 	speed2 = (i == max ? 0.0 : float(i)) / MAX_ITER;
 	
-	gl_Position = vec4(position, 1.0);
+	gl_Position = posit;
 }

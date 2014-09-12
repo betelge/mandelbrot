@@ -5,6 +5,8 @@
 
 attribute vec3 position;
 
+uniform mat4 modelViewMatrix;
+
 vec2 pos;
 
 uniform float MAX_ITER;
@@ -48,8 +50,9 @@ vec4 iter(vec4 z)
 }
 
 void main(void)
-{	
-	pos = 2.*position.xy;
+{
+	vec4 posit = modelViewMatrix * vec4(position, 1.);
+	pos = 2.*posit.xy;
 	
 	// Calculate c
 	
@@ -87,12 +90,11 @@ void main(void)
 	
 	float speed2 = log(float(i) + smooth);
 	
-	float sat = 1.;
-	if(i == max) sat = 0.;
+	float val = (i == max ? 0. : 1.);
 	
-	hsv = vec3(speed2, sat, 1.);
+	hsv = vec3(speed2, 1., val);
 	
-	gl_Position = vec4(position, 1.0);
+	gl_Position = posit;
 }
 
 // Double emulation based on GLSL Mandelbrot Shader by Henry Thasler (www.thasler.org/blog)

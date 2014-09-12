@@ -192,11 +192,11 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 			input.setValue((int)maxInterationsUniform.getFloats()[0]);
 			maxIterDialog.setView(input);
 			maxIterDialog.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-			public void onClick(DialogInterface dialog, int whichButton) {
-			  	int value = input.getValue();
-			  	maxInterationsUniform.set((float)value);
-			  	mandelPass.setSilent(false);
-			  }
+				public void onClick(DialogInterface dialog, int whichButton) {
+				  	int value = input.getValue();
+				  	maxInterationsUniform.set((float)value);
+				  	mandelPass.setSilent(false);
+				}
 			});
 			maxIterDialog.show();
 		}
@@ -212,11 +212,11 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 			input2.setValue((int)splitterFloatUniform.getFloats()[0]);
 			splitFloatDialog.setView(input2);
 			splitFloatDialog.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-			public void onClick(DialogInterface dialog, int whichButton) {
-			  	int value = input2.getValue();
-			  	splitterFloatUniform.set((float)value);
-			  	mandelPass.setSilent(false);
-			  }
+				public void onClick(DialogInterface dialog, int whichButton) {
+				  	int value = input2.getValue();
+				  	splitterFloatUniform.set((float)value);
+				  	mandelPass.setSilent(false);
+				}
 			});
 			splitFloatDialog.show();
 		}
@@ -351,46 +351,45 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		// Limit the indices to the size of short
 		if(w*h > maxShort) {
 			int r = w % maxShort;
-			h = (maxShort - r) / h;
+			h = (maxShort - r) / w;
 		}
-
+		
+		// TODO: Use just one piece repeatedly
 		// How many short sized pieces do we need?
 		int parts = (int)Math.ceil((float)fullH/h);
 		
+		
+		ShortBuffer indices = ShortBuffer.allocate(w*h);
+		Geometry.Attribute posAt = new Geometry.Attribute();
+		posAt.name = "position";
+		posAt.size = 3;
+		posAt.type = Geometry.Type.FLOAT;
+		posAt.buffer = FloatBuffer.allocate(3*w*h);
+		
+		for(int i = 0; i < h; i++) {
+			for(int j = 0; j < w; j++) {
+				((FloatBuffer) posAt.buffer).put(-1 + (2*j + 1)/(float)w);
+				((FloatBuffer) posAt.buffer).put(-1 + (2*i + 1)/(float)fullH);
+				((FloatBuffer) posAt.buffer).put(0);
+				
+				indices.put((short)(i*w+j));
+			}
+		}
+		posAt.buffer.flip();
+		indices.flip();
+		
+		List<Geometry.Attribute> lat = new ArrayList<Geometry.Attribute>();
+		lat.add(posAt);
+		Geometry pixelMesh = new Geometry(Geometry.PrimitiveType.POINTS, indices, lat);
+		
+		// Add multiple pieces
 		for(int p = 0; p < parts; p++) {
-			// Are we at an end piece that needs to be smaller?
-			int trunc = 0;
-			if((p+1)*h > fullH) {
-				trunc = (p+1)*h - fullH;
-			}
-			ShortBuffer indices = ShortBuffer.allocate(w*h);
-			Geometry.Attribute posAt = new Geometry.Attribute();
-			posAt.name = "position";
-			posAt.size = 3;
-			posAt.type = Geometry.Type.FLOAT;
-			posAt.buffer = FloatBuffer.allocate(3*w*h);
-			
-			for(int i = 0; i < h-trunc; i++) {
-				for(int j = 0; j < w; j++) {
-					((FloatBuffer) posAt.buffer).put(-1 + (2*j + 1)/(float)w);
-					((FloatBuffer) posAt.buffer).put(-1 + (2*(i+p*h) + 1)/(float)fullH);
-					((FloatBuffer) posAt.buffer).put(0);
-					
-					indices.put((short)(i*w+j));
-				}
-			}
-			posAt.buffer.flip();
-			indices.flip();
-			
-			List<Geometry.Attribute> lat = new ArrayList<Geometry.Attribute>();
-			lat.add(posAt);
-			Geometry pixelMesh = new Geometry(Geometry.PrimitiveType.POINTS, indices, lat);
-			
 			GeometryNode pixelGeometryNode = new GeometryNode(pixelMesh, mandelMaterial);
-			
+			pixelGeometryNode.getTransform().getPosition().setY(2*p/(float)parts);
 			vertexRootNode.attach(pixelGeometryNode);
 		}
-
+		
+		
 		finalMaterial = new Material(finalShaderProg);
 		finalMaterial.addTexture("tex", mandelTexture);
 		finalMaterial.addUniform(offsetFinalUniform);
