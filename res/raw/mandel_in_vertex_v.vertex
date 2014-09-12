@@ -1,0 +1,35 @@
+
+attribute vec3 position;
+
+uniform float MAX_ITER;
+uniform vec2 scale;
+uniform vec2 offset;
+
+varying float speed2;
+
+vec2 iter(vec2 z, vec2 c)
+{
+	return vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
+}
+
+void main(void)
+{
+	vec2 c = 2.*(scale*position.xy + offset);
+	
+	// (c.x, x.y, iteration)
+	vec2 z = vec2(0.0, 0.0);
+	
+	/*while( z.x*z.x + z.y*z.y < 4.0 && z.z < MAX_ITER)
+		z = iter(z);*/
+		
+	int i;
+	int max = int(MAX_ITER);
+	for( i=0; i<max; i++ ) {
+		if(z.x*z.x + z.y*z.y > 4.0) break;
+		z = iter(z,c);
+	}
+	
+	speed2 = (i == max ? 0.0 : float(i)) / MAX_ITER;
+	
+	gl_Position = vec4(position, 1.0);
+}
