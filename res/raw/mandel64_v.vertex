@@ -2,14 +2,10 @@
 
 attribute vec3 position;
 
-uniform mat4 modelViewMatrix;
-
 varying vec2 pos;
 
 void main(void)
-{
-	vec4 posit = modelViewMatrix * vec4(position, 1.);
-	
-	pos = 2.*posit.xy;
-	gl_Position = posit;
+{	
+	pos = 2.*position.xy;
+	gl_Position = vec4(position, 1.);
 }

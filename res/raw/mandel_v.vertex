@@ -1,7 +1,6 @@
 
 attribute vec3 position;
 
-uniform mat4 modelViewMatrix;
 uniform vec2 scale;
 uniform vec2 offset;
 
@@ -9,7 +8,6 @@ varying vec2 c;
 
 void main(void)
 {
-	vec4 pos = modelViewMatrix * vec4(position, 1.);
-	c = 2.*(scale*pos.xy + offset);
-	gl_Position = vec4(pos);
+	c = 2.*(scale*position.xy + offset);
+	gl_Position = vec4(position, 1.);
 }
