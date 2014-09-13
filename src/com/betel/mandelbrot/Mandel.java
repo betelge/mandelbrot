@@ -56,13 +56,22 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 	private RenderPass clearPass;
 	private RenderPass mandelPass;
 	private Material mandelMaterial;
+	private RenderMode renderMode = RenderMode.SINGLE;
 	private ShaderProgram mandelShaderProg;
 	private ShaderProgram mandel64ShaderProg;
 	private ShaderProgram mandel64ExpShaderProg;
 	private ShaderProgram mandelInVertexShader;
 	private ShaderProgram mandel64InVertexShader;
+	private float scale = 1f;
+	private float asp = 1f;
 	private float scaleMandelX = 1f, scaleMandelY = 1f;
 	private double offsetMandelX = 0f, offsetMandelY = 0f;
+	static final private String SCALE = "scale";
+	static final private String OFFSET_X = "offsetMandelX";
+	static final private String OFFSET_Y = "offsetMandelY";
+	static final private String SPLITTER = "splitter";
+	static final private String MAX_ITER = "maxIter";
+	static final private String RENDER_MODE = "renderMode";
 	private Uniform scaleMandelUniform;
 	private Uniform offsetMandelUniform;
 	private Uniform offsetFineMandelUniform;
@@ -87,6 +96,24 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 	
 	private AlertDialog.Builder maxIterDialog;
 	private AlertDialog.Builder splitFloatDialog;
+	
+	static public enum RenderMode {
+		SINGLE(0x001),
+		EMULATED_DOUBLE(0x002),
+		EXP_EMULATED_DOUBLE(0x003),
+		SINGLE_IN_VERTEX(0x004),
+		EXP_EMULATED_DOUBLE_IN_VERTEX(0x005);
+		
+		int value;
+		
+		RenderMode(int value) {
+			this.value = value;
+		}
+		
+		public int getValue() {
+			return value;
+		}
+	}
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -130,8 +157,61 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		offsetFinalUniform = new Uniform("offset", offsetFinalX, offsetFinalY);
 		scaleFinalUniform = new Uniform("scale", scaleFinalX, scaleFinalY);
 		
+		if(savedInstanceState != null) {
+			offsetMandelX = savedInstanceState.getDouble(OFFSET_X);
+		    offsetMandelY = savedInstanceState.getDouble(OFFSET_Y);
+		    setOffsetMandelUniforms(offsetFinalX, offsetFinalY);
+		    
+		    scale = savedInstanceState.getFloat(SCALE);
+		    
+		    splitterFloatUniform.set(savedInstanceState.getFloat(SPLITTER));
+		    maxInterationsUniform.set(savedInstanceState.getFloat(MAX_ITER));
+		    
+		    renderMode = (RenderMode) savedInstanceState.getSerializable(RENDER_MODE);
+		}
+		
+		switch(renderMode) {
+		case SINGLE:
+			mandelMaterial.setShaderProgram(mandelShaderProg);
+			break;
+		case EMULATED_DOUBLE:
+			mandelMaterial.setShaderProgram(mandel64ShaderProg);
+			break;
+		case EXP_EMULATED_DOUBLE:
+			mandelMaterial.setShaderProgram(mandel64ExpShaderProg);
+			break;
+		case SINGLE_IN_VERTEX:
+			mandelMaterial.setShaderProgram(mandelInVertexShader);
+			break;
+		case EXP_EMULATED_DOUBLE_IN_VERTEX:
+			mandelMaterial.setShaderProgram(mandel64InVertexShader);
+			break;
+		default:
+			mandelMaterial.setShaderProgram(mandelShaderProg);
+		}
+		
 	}
-
+	
+	@Override
+	public void onSaveInstanceState(Bundle savedInstanceState) {
+		savedInstanceState.putDouble(OFFSET_X, offsetMandelX);
+		savedInstanceState.putDouble(OFFSET_Y, offsetMandelY);
+		
+		float s;
+		if(asp > 1)
+			s = scaleMandelY;
+		else
+			s = scaleMandelX;
+		savedInstanceState.putFloat(SCALE, s);
+		
+		savedInstanceState.putFloat(SPLITTER, splitterFloatUniform.getFloats()[0]);
+		savedInstanceState.putFloat(MAX_ITER, maxInterationsUniform.getFloats()[0]);
+		
+		savedInstanceState.putSerializable(RENDER_MODE, renderMode);
+		
+		super.onSaveInstanceState(savedInstanceState);
+	}
+	
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		// Inflate the menu; this adds items to the action bar if it is present.
@@ -147,6 +227,7 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		int id = item.getItemId();
 		if(id == R.id.normalMandel) {
 			mandelMaterial.setShaderProgram(mandelShaderProg);
+			renderMode = RenderMode.SINGLE;
 			mandelPass.setSilent(false);
 		}
 		if(id == R.id.emulateDoubleCheckBox) {			
@@ -155,6 +236,7 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 	            item.setChecked(false);
 	        }
 	        else {*/
+				renderMode = RenderMode.EMULATED_DOUBLE;
 	        	mandelMaterial.setShaderProgram(mandel64ShaderProg);
 	        	/*item.setChecked(true);
 	        }*/
@@ -167,6 +249,7 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 	        	item.setChecked(false);
 			}
 			else {*/
+				renderMode = RenderMode.EXP_EMULATED_DOUBLE;
 	        	mandelMaterial.setShaderProgram(mandel64ExpShaderProg);
 	        	/*item.setChecked(true);
 	        }*/
@@ -174,10 +257,12 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 			return true;
 		}
 		if(id == R.id.mandelInVertex) {
+			renderMode = RenderMode.SINGLE_IN_VERTEX;
 			mandelMaterial.setShaderProgram(mandelInVertexShader);
 			mandelPass.setSilent(false);
 		}
 		if(id == R.id.emulatedDoubleInVertex) {
+			renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
 			mandelMaterial.setShaderProgram(mandel64InVertexShader);
 			mandelPass.setSilent(false);
 		}
@@ -250,9 +335,7 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 					offsetFinalY = 0f;
 					
 					scaleMandelUniform.set(scaleMandelX, scaleMandelY);
-					offsetMandelUniform.set((float)offsetMandelX, (float)offsetMandelY);
-					offsetFineMandelUniform.set((float)(offsetMandelX - (float)offsetMandelX),
-							(float)(offsetMandelY - (float)offsetMandelY));
+					setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
 					
 					scaleFinalUniform.set(scaleFinalX, scaleFinalY);
 					offsetFinalUniform.set(offsetFinalX, offsetFinalY);
@@ -314,21 +397,19 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		
 		float vert = view.getHeight();
 		float hori = view.getWidth();
-		float asp = hori / vert;
+		asp = hori / vert;
 		if( asp > 1 ) {
-			vert = 1;
-			hori = asp;
+			scaleMandelY = scale;
+			scaleMandelX = scale*asp;
+			
 		} else {
-			vert = 1f/asp;
-			hori = 1;
-		}
-		
-		if(scaleMandelX == 1f || scaleMandelY == 1f) {
-			scaleMandelX = hori;
-			scaleMandelY = vert;
+			scaleMandelY = scale/asp;
+			scaleMandelX = scale;
 		}
 		
 		scaleMandelUniform.set(scaleMandelX, scaleMandelY);
+		setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
+		
 		
 		Texture mandelTexture = new Texture(null, Texture.TextureType.TEXTURE_2D, view.getWidth(),
 				view.getHeight(), Texture.TexelType.UBYTE, Texture.Format.GL_RGB, Texture.Filter.NEAREST,
@@ -402,11 +483,17 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 			mandelPass = mandelVertexPass;//new QuadRenderPass(mandelMaterial, mandelFBO);
 			mandelVertexPass.setFbo(mandelFBO);
 			mandelPass.setOneTime(true);
+			mandelPass.setSilent(false);
 			model.addRenderPass(mandelPass);
 			finalPass = new QuadRenderPass(finalMaterial);
 			model.addRenderPass(finalPass);
 			model.addRenderPass(new CheckGlErrorPass(true));		
 		}
+	}
+	
+	private void setOffsetMandelUniforms(double x, double y) {
+		offsetMandelUniform.set((float)x, (float)y);
+		offsetFineMandelUniform.set((float)(x-(float)x), (float)(y-(float)y));
 	}
 
 }
