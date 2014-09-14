@@ -44,6 +44,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.NumberPicker;
 
 public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayoutChangeListener {
@@ -184,10 +185,15 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		
 		model = new Alw3dModel();
 		view = new Alw3dView(this, model);
-		setContentView(view/*R.layout.activity_mandel*/);
+		setContentView(R.layout.activity_mandel);
 				
 		view.addOnLayoutChangeListener(this);
+		FrameLayout frameLayout = (FrameLayout)findViewById(R.id.FrameLayout1);
+		frameLayout.addView(view, 0);
 		view.setOnTouchListener(this);
+		
+		// TODO: Should this be here?
+		findViewById(R.id.HUD).setVisibility(View.GONE);
 	}
 	
 	@Override
@@ -211,6 +217,12 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 	}
 	
 	@Override
+	public void onRestart() {
+		super.onRestart();
+		mandelPass.setSilent(false);
+	}
+	
+	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		// Inflate the menu; this adds items to the action bar if it is present.
 		getMenuInflater().inflate(R.menu.mandel, menu);
@@ -223,6 +235,16 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		// automatically handle clicks on the Home/Up button, so long
 		// as you specify a parent activity in AndroidManifest.xml.
 		int id = item.getItemId();
+		if(id == R.id.showHUD) {
+			if(!item.isChecked()) {
+				findViewById(R.id.HUD).setVisibility(View.VISIBLE);
+				item.setChecked(true);
+			}
+			else {
+				findViewById(R.id.HUD).setVisibility(View.GONE);
+				item.setChecked(false);
+			}
+		}
 		if(id == R.id.normalMandel) {
 			mandelMaterial.setShaderProgram(mandelShaderProg);
 			renderMode = RenderMode.SINGLE;
