@@ -38,16 +38,24 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.View.OnLayoutChangeListener;
 import android.view.View.OnTouchListener;
 import android.widget.CheckBox;
-import android.widget.CompoundButton;
-import android.widget.CompoundButton.OnCheckedChangeListener;
+import android.widget.RadioButton;
+import android.widget.RadioGroup.OnCheckedChangeListener;
+import android.widget.SeekBar;
+import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.NumberPicker;
+import android.widget.RadioGroup;
+import android.widget.TextView;
+import android.widget.Toast;
 
-public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayoutChangeListener {
+public class Mandel extends ActionBarActivity implements OnTouchListener,
+OnSeekBarChangeListener, OnLayoutChangeListener, OnCheckedChangeListener,
+CheckGlErrorPass.OnGlErrorListener {
 	
 	private static String TAG = "MANDEL";
 	
@@ -73,6 +81,7 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 	static final private String SPLITTER = "splitter";
 	static final private String MAX_ITER = "maxIter";
 	static final private String RENDER_MODE = "renderMode";
+	static final private String HUD = "HUD";
 	private Uniform scaleMandelUniform;
 	private Uniform offsetMandelUniform;
 	private Uniform offsetFineMandelUniform;
@@ -97,6 +106,9 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 	
 	private AlertDialog.Builder maxIterDialog;
 	private AlertDialog.Builder splitFloatDialog;
+	
+	private Toast outOfMemToast;
+	private Toast otherGlErrorToast;
 	
 	static public enum RenderMode {
 		SINGLE(0x001),
@@ -150,6 +162,31 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		offsetFinalUniform = new Uniform("offset", offsetFinalX, offsetFinalY);
 		scaleFinalUniform = new Uniform("scale", scaleFinalX, scaleFinalY);
 		
+		outOfMemToast = Toast.makeText(this,
+				"GPU Shader took too long to run.\n" +
+				"Try simpler settings or zoom out.",
+				Toast.LENGTH_LONG);
+		otherGlErrorToast = Toast.makeText(this,
+				"OpenGL error", Toast.LENGTH_SHORT);
+		
+		model = new Alw3dModel();
+		view = new Alw3dView(this, model);
+		setContentView(R.layout.activity_mandel);
+				
+		view.addOnLayoutChangeListener(this);
+		FrameLayout frameLayout = (FrameLayout)findViewById(R.id.FrameLayout1);
+		frameLayout.addView(view, 0);
+		view.setOnTouchListener(this);
+		
+		SeekBar iterSeekBar = (SeekBar)findViewById(R.id.iterSeekBar);
+		iterSeekBar.setMax(500);
+		iterSeekBar.setProgress(40);
+		iterSeekBar.setOnSeekBarChangeListener(this);
+		
+		View tempView = findViewById(R.id.linearLayout);
+		RadioGroup renderModeRadioGroup = (RadioGroup)tempView.findViewById(R.id.renderModeRadioGroup);
+		renderModeRadioGroup.setOnCheckedChangeListener(this);
+		
 		if(savedInstanceState != null) {
 			offsetMandelX = savedInstanceState.getDouble(OFFSET_X);
 		    offsetMandelY = savedInstanceState.getDouble(OFFSET_Y);
@@ -161,8 +198,23 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		    maxInterationsUniform.set(savedInstanceState.getFloat(MAX_ITER));
 		    
 		    renderMode = (RenderMode) savedInstanceState.getSerializable(RENDER_MODE);
+		    
+		    int hudVisibility = savedInstanceState.getInt(HUD);
+		    View hudView = findViewById(R.id.HUD);
+		    if(hudView != null)
+		    	hudView.setVisibility(hudVisibility);
+		}
+		else {
+			findViewById(R.id.HUD).setVisibility(View.GONE);
+			findViewById(R.id.linearLayout).findViewById(
+					R.id.renderModeRadioGroup).setVisibility(
+							View.GONE);
 		}
 		
+		setRenderMode(renderMode);
+	}
+	
+	private void setRenderMode(RenderMode renderMode) {
 		switch(renderMode) {
 		case SINGLE:
 			mandelMaterial.setShaderProgram(mandelShaderProg);
@@ -182,18 +234,6 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		default:
 			mandelMaterial.setShaderProgram(mandelShaderProg);
 		}
-		
-		model = new Alw3dModel();
-		view = new Alw3dView(this, model);
-		setContentView(R.layout.activity_mandel);
-				
-		view.addOnLayoutChangeListener(this);
-		FrameLayout frameLayout = (FrameLayout)findViewById(R.id.FrameLayout1);
-		frameLayout.addView(view, 0);
-		view.setOnTouchListener(this);
-		
-		// TODO: Should this be here?
-		findViewById(R.id.HUD).setVisibility(View.GONE);
 	}
 	
 	@Override
@@ -212,6 +252,8 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		savedInstanceState.putFloat(MAX_ITER, maxInterationsUniform.getFloats()[0]);
 		
 		savedInstanceState.putSerializable(RENDER_MODE, renderMode);
+		
+		savedInstanceState.putInt(HUD, findViewById(R.id.HUD).getVisibility());
 		
 		super.onSaveInstanceState(savedInstanceState);
 	}
@@ -244,52 +286,6 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 				findViewById(R.id.HUD).setVisibility(View.GONE);
 				item.setChecked(false);
 			}
-		}
-		if(id == R.id.normalMandel) {
-			mandelMaterial.setShaderProgram(mandelShaderProg);
-			renderMode = RenderMode.SINGLE;
-			setRenderPasses();
-			mandelPass.setSilent(false);
-		}
-		if(id == R.id.emulateDoubleCheckBox) {			
-			/*if( item.isChecked()) {
-	            mandelMaterial.setShaderProgram(mandelShaderProg);
-	            item.setChecked(false);
-	        }
-	        else {*/
-				renderMode = RenderMode.EMULATED_DOUBLE;
-	        	mandelMaterial.setShaderProgram(mandel64ShaderProg);
-				setRenderPasses();
-	        	/*item.setChecked(true);
-	        }*/
-			mandelPass.setSilent(false);
-			return true;
-		}
-		if(id == R.id.experimentalShader) {
-			/*if(item.isChecked()) {
-				mandelMaterial.setShaderProgram(mandel64ShaderProg);
-	        	item.setChecked(false);
-			}
-			else {*/
-				renderMode = RenderMode.EXP_EMULATED_DOUBLE;
-	        	mandelMaterial.setShaderProgram(mandel64ExpShaderProg);
-				setRenderPasses();
-	        	/*item.setChecked(true);
-	        }*/
-			mandelPass.setSilent(false);
-			return true;
-		}
-		if(id == R.id.mandelInVertex) {
-			renderMode = RenderMode.SINGLE_IN_VERTEX;
-			mandelMaterial.setShaderProgram(mandelInVertexShader);
-			setRenderPasses();
-			mandelPass.setSilent(false);
-		}
-		if(id == R.id.emulatedDoubleInVertex) {
-			renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
-			mandelMaterial.setShaderProgram(mandel64InVertexShader);
-			setRenderPasses();
-			mandelPass.setSilent(false);
 		}
 		if(id == R.id.chooseMaxIter) {
 			maxIterDialog = new AlertDialog.Builder(this);
@@ -377,6 +373,100 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		return false;
 	}
 	
+	@Override
+	public void onProgressChanged(SeekBar arg0, int arg1, boolean arg2) {
+		TextView iterText = (TextView)findViewById(R.id.iterTextView);
+		iterText.setText("Iterations: " + arg0.getProgress());
+		
+		// If in a simple mode change the fractal live
+		if(renderMode == RenderMode.SINGLE ||
+				renderMode == RenderMode.SINGLE_IN_VERTEX) {
+			maxInterationsUniform.set(arg0.getProgress());
+			mandelPass.setSilent(false);
+		}
+	}
+
+	@Override
+	public void onStartTrackingTouch(SeekBar arg0) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void onStopTrackingTouch(SeekBar arg0) {
+		if(arg0.getId() == R.id.iterSeekBar) {
+			maxInterationsUniform.set(arg0.getProgress());
+			mandelPass.setSilent(false);
+		}
+	}
+
+	@Override
+	public void onCheckedChanged(RadioGroup arg0, int arg1) {
+		if(arg0.getId() != R.id.renderModeRadioGroup) return;
+		
+		switch(arg0.getCheckedRadioButtonId()) {
+		case R.id.radioS:
+			renderMode = RenderMode.SINGLE;
+			setRenderMode(renderMode);
+			setRenderPasses();
+			mandelPass.setSilent(false);
+			break;
+		case R.id.radioED:
+			renderMode = RenderMode.EMULATED_DOUBLE;
+			setRenderMode(renderMode);
+			setRenderPasses();
+	        mandelPass.setSilent(false);
+			break;
+		case R.id.radioExpED:
+			renderMode = RenderMode.EXP_EMULATED_DOUBLE;
+			setRenderMode(renderMode);
+			setRenderPasses();
+	        mandelPass.setSilent(false);
+	        break;
+		case R.id.radioSV:
+			renderMode = RenderMode.SINGLE_IN_VERTEX;
+			setRenderMode(renderMode);
+			setRenderPasses();
+			mandelPass.setSilent(false);
+			break;
+		case R.id.radioEDV:
+			renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
+			setRenderMode(renderMode);
+			setRenderPasses();
+			mandelPass.setSilent(false);
+			break;
+		default:
+			renderMode = RenderMode.SINGLE;
+			setRenderMode(renderMode);
+			setRenderPasses();
+			mandelPass.setSilent(false);
+			break;
+		}
+	}
+	
+	public void toggleModeSettings(View view) {
+		View group = findViewById(R.id.renderModeRadioGroup);
+		int vis = group.getVisibility();
+		if(vis == View.VISIBLE)
+			vis = View.GONE;
+		else
+			vis = View.VISIBLE;
+		group.setVisibility(vis);
+	}
+	
+	public void resetPos(View view) {
+		offsetMandelX = -0.75f/2;
+		offsetMandelY = 0;
+		scale = 1;
+		
+		setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
+		setScaleMandelUniform(scale);
+		renderMode = RenderMode.SINGLE;
+		maxInterationsUniform.set(40);
+		
+		mandelPass.setSilent(false);
+	}
+
 	private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
 		@Override
 		public boolean onScale(ScaleGestureDetector detector) {
@@ -420,19 +510,7 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		
 		// This will be done first after the view receives it's size in the layout.
 		
-		float vert = view.getHeight();
-		float hori = view.getWidth();
-		asp = hori / vert;
-		if( asp > 1 ) {
-			scaleMandelY = scale;
-			scaleMandelX = scale*asp;
-			
-		} else {
-			scaleMandelY = scale/asp;
-			scaleMandelX = scale;
-		}
-		
-		scaleMandelUniform.set(scaleMandelX, scaleMandelY);
+		setScaleMandelUniform(scale);
 		setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
 		
 		
@@ -516,7 +594,9 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 			model.addRenderPass(mandelPass);
 			finalPass = new QuadRenderPass(finalMaterial);
 			model.addRenderPass(finalPass);
-			model.addRenderPass(new CheckGlErrorPass(true));		
+			CheckGlErrorPass errorPass = new CheckGlErrorPass(true);
+			model.addRenderPass(errorPass);
+			errorPass.setOnGlErrorListener(this);
 		}
 	}
 	
@@ -533,6 +613,29 @@ public class Mandel extends ActionBarActivity implements OnTouchListener, OnLayo
 		offsetFineMandelUniform.set((float)(x-(float)x), (float)(y-(float)y));
 	}
 
+	private void setScaleMandelUniform(float s) {
+		float vert = view.getHeight();
+		float hori = view.getWidth();
+		asp = hori / vert;
+		if( asp > 1 ) {
+			scaleMandelY = s;
+			scaleMandelX = s*asp;
+			
+		} else {
+			scaleMandelY = s/asp;
+			scaleMandelX = s;
+		}
+		
+		scaleMandelUniform.set(scaleMandelX, scaleMandelY);
+	}
+
+	@Override
+	public void onGlError(int error) {
+		if(error == GLES20.GL_OUT_OF_MEMORY)
+			outOfMemToast.show();
+		else
+			otherGlErrorToast.show();
+	}
 }
 
 

@@ -16,65 +16,98 @@
         android:paddingRight="@dimen/activity_horizontal_margin"
         android:paddingTop="@dimen/activity_vertical_margin" >
 
-        <SeekBar
-            android:id="@+id/seekBar1"
+        <LinearLayout
+            android:id="@+id/LinearLayout1"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <RadioGroup
-            android:id="@+id/radioGroup1"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" >
-
-            <RadioButton
-                android:id="@+id/radioS"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="Single precision (Default)" />
-
-            <RadioButton
-                android:id="@+id/radioED"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Emulate double precision" />
-
-            <RadioButton
-                android:id="@+id/radioExpED"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Use experimental 64 bit shader" />
-            
-            <RadioButton
-                android:id="@+id/radioSV"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Single precision in vertex shader" />
-            
-            <RadioButton
-                android:id="@+id/radioEDV"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Emulate double precision in vertex shader" />
-        </RadioGroup>
-
-        <ToggleButton
-            android:id="@+id/toggleButton1"
-            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="ToggleButton" />
+            android:background="@color/settingsBackground"
+            android:orientation="vertical" >
 
-        <CheckBox
-            android:id="@+id/checkBox1"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="CheckBox" />
+            <TextView
+                android:id="@+id/iterTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Iterations:"
+                android:textAppearance="?android:attr/textAppearanceSmall"
+                android:textColor="?android:attr/textColorPrimaryDisableOnly" />
 
-        <CheckBox
-            android:id="@+id/checkBox2"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="CheckBox" />
+            <SeekBar
+                android:id="@+id/iterSeekBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/linearLayout"
+            android:layout_width="match_parent"
+            android:layout_height="fill_parent"
+            android:gravity="right" >
+
+            <RadioGroup
+                android:id="@+id/renderModeRadioGroup"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.91"
+                android:background="@color/settingsBackground" >
+
+                <RadioButton
+                    android:id="@+id/radioS"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="Single precision (Default)" />
+
+                <RadioButton
+                    android:id="@+id/radioED"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Emulate double precision" />
+
+                <RadioButton
+                    android:id="@+id/radioExpED"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Use experimental 64 bit shader" />
+
+                <RadioButton
+                    android:id="@+id/radioSV"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Single precision in vertex shader" />
+
+                <RadioButton
+                    android:id="@+id/radioEDV"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Emulate double precision in vertex shader" />
+            </RadioGroup>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="vertical" >
+
+                <Button
+                    android:id="@+id/button1"
+                    style="?android:attr/buttonStyleSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right"
+                    android:onClick="toggleModeSettings"
+                    android:text="Modes" />
+
+                <Button
+                    android:id="@+id/button2"
+                    style="?android:attr/buttonStyleSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right"
+                    android:onClick="resetPos"
+                    android:text="Reset" />
+
+            </LinearLayout>
+        </LinearLayout>
 
     </LinearLayout>
 

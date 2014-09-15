@@ -1,11 +1,11 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    xmlns:mandelbrot="http://schemas.android.com/apk/res-auto"
     tools:context="com.betel.mandelbrot.Mandel" >
 
-    <item android:id="@+id/showHUD" android:orderInCategory="3" android:title="Show HUD" android:checked="false" android:checkable="true"></item><item android:id="@+id/normalMandel" android:orderInCategory="5" android:title="Mandel in fragment shader (default)"></item><item android:id="@+id/emulateDoubleCheckBox" android:checkable="false" android:checked="false" android:title="Emulate double precision" android:enabled="true" android:visible="true" android:orderInCategory="10"/>
-    <item android:id="@+id/experimentalShader" android:checked="false" android:visible="true" android:checkable="false" android:enabled="true" android:title="Use experimental 64 bit shader" android:orderInCategory="20"></item>
-    <item android:id="@+id/mandelInVertex" android:orderInCategory="25" android:title="Single precision in vertex shader"></item><item android:id="@+id/emulatedDoubleInVertex" android:orderInCategory="27" android:title="Emulate double precision in vertex shader"></item><item android:id="@+id/chooseMaxIter" android:title="Choose maximum iteration" android:orderInCategory="30"/>
+    <item android:id="@+id/showHUD" android:orderInCategory="3" android:title="HUD" mandelbrot:showAsAction="ifRoom"></item>
+    <item android:id="@+id/chooseMaxIter" android:title="Choose maximum iteration" android:orderInCategory="30"/>
     <item android:id="@+id/chooseSplitter" android:title="Choose splitter float" android:orderInCategory="40"/>
     
     
