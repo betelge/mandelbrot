@@ -9,6 +9,6 @@ varying vec2 tc;
 
 void main(void)
 {
-	tc = textureCoord; //scale*textureCoord + 0.5*offset;
+	tc = textureCoord;
 	gl_Position = vec4(position.xy/scale - offset, position.z, 1.0);
 }
