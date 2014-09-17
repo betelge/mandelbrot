@@ -3,12 +3,15 @@ package com.betel.mandelbrot;
 import java.nio.FloatBuffer;
 import java.nio.ShortBuffer;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import utils.ShaderLoader;
 import utils.StringLoader;
 import betel.alw3d.Alw3dModel;
 import betel.alw3d.Alw3dView;
+import betel.alw3d.math.Vector3f;
 import betel.alw3d.renderer.CameraNode;
 import betel.alw3d.renderer.FBO;
 import betel.alw3d.renderer.Geometry;
@@ -24,6 +27,7 @@ import betel.alw3d.renderer.passes.CheckGlErrorPass;
 import betel.alw3d.renderer.passes.ClearPass;
 import betel.alw3d.renderer.passes.RenderPass;
 import betel.alw3d.renderer.passes.SceneRenderPass;
+import betel.alw3d.renderer.passes.RenderPass.OnRenderPassFinishedListener;
 import android.support.v7.app.ActionBarActivity;
 import android.text.Editable;
 import android.app.AlertDialog;
@@ -55,7 +59,7 @@ import android.widget.Toast;
 
 public class Mandel extends ActionBarActivity implements OnTouchListener,
 OnSeekBarChangeListener, OnLayoutChangeListener, OnCheckedChangeListener,
-CheckGlErrorPass.OnGlErrorListener {
+CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	private static String TAG = "MANDEL";
 	
@@ -66,6 +70,7 @@ CheckGlErrorPass.OnGlErrorListener {
 	private RenderPass mandelPass;
 	private Material mandelMaterial;
 	private RenderMode renderMode = RenderMode.SINGLE;
+	private boolean renderMosaic = false;
 	private ShaderProgram mandelShaderProg;
 	private ShaderProgram mandel64ShaderProg;
 	private ShaderProgram mandel64ExpShaderProg;
@@ -87,6 +92,7 @@ CheckGlErrorPass.OnGlErrorListener {
 	private Uniform offsetFineMandelUniform;
 	
 	private SceneRenderPass mandelVertexPass;
+	private SceneRenderPass mandelVertexMosaicPass;
 	
 	private RenderPass finalPass;
 	private Material finalMaterial;
@@ -103,12 +109,18 @@ CheckGlErrorPass.OnGlErrorListener {
 	private GestureDetector gestureDetector;
 	
 	private FBO mandelFBO;
+	private FBO mandelFBO2;
+	
+	private RenderPass mandelFbo2toFboPass;
 	
 	private AlertDialog.Builder maxIterDialog;
 	private AlertDialog.Builder splitFloatDialog;
 	
 	private Toast outOfMemToast;
 	private Toast otherGlErrorToast;
+	private Toast doneToast;
+	
+	private TextView posTextView;
 	
 	static public enum RenderMode {
 		SINGLE(0x001),
@@ -153,6 +165,12 @@ CheckGlErrorPass.OnGlErrorListener {
 		splitterFloatUniform = new Uniform("split", 1025f);
 		mandelMaterial.addUniform(splitterFloatUniform);
 		
+		mandelVertexPass = new SceneRenderPass(new Node(),
+				/*Ignored dummy camera*/ new CameraNode(asp, asp, asp, asp)/*,
+				mandelFBO*/);
+		mandelVertexMosaicPass = new SceneRenderPass(new Node(),
+				/*dummy*/new CameraNode(1f, 1f, 0.01f, 1000f));
+		
 
 		scaleDetector = new ScaleGestureDetector(this, new ScaleListener());
 		gestureDetector = new GestureDetector(this, new GestureListener());
@@ -168,6 +186,7 @@ CheckGlErrorPass.OnGlErrorListener {
 				Toast.LENGTH_LONG);
 		otherGlErrorToast = Toast.makeText(this,
 				"OpenGL error", Toast.LENGTH_SHORT);
+		doneToast = Toast.makeText(this, "Done", Toast.LENGTH_SHORT);
 		
 		model = new Alw3dModel();
 		view = new Alw3dView(this, model);
@@ -179,10 +198,10 @@ CheckGlErrorPass.OnGlErrorListener {
 		view.setOnTouchListener(this);
 		
 		SeekBar iterSeekBar = (SeekBar)findViewById(R.id.iterSeekBar);
-		iterSeekBar.setMax(500);
+		iterSeekBar.setMax(1024);
 		iterSeekBar.setProgress(40);
 		iterSeekBar.setOnSeekBarChangeListener(this);
-		
+				
 		View tempView = findViewById(R.id.linearLayout);
 		RadioGroup renderModeRadioGroup = (RadioGroup)tempView.findViewById(R.id.renderModeRadioGroup);
 		renderModeRadioGroup.setOnCheckedChangeListener(this);
@@ -210,6 +229,9 @@ CheckGlErrorPass.OnGlErrorListener {
 					R.id.renderModeRadioGroup).setVisibility(
 							View.GONE);
 		}
+		
+		posTextView = (TextView) findViewById(R.id.posTextView);
+		setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
 		
 		setRenderMode(renderMode);
 	}
@@ -339,38 +361,100 @@ CheckGlErrorPass.OnGlErrorListener {
 				if(event.getPointerCount() == 1) {
 					// Probably last touch, so redraw the set
 					
-					// Pause the final drawing
-					clearPass.setSilent(true);
-					finalPass.setSilent(true);
+					drawFinalToFboOnce();
 					
-					// Put all the transforms in the mandel redraw
-					offsetMandelX += offsetFinalX*scaleFinalX*scaleMandelX;
-					offsetMandelY += offsetFinalY*scaleFinalY*scaleMandelY;
-					scaleMandelX *= scaleFinalX;
-					scaleMandelY *= scaleFinalY;
+					synchronized (model.getRenderPasses()) {
+						
+						// Put all the transforms in the mandel redraw
+						offsetMandelX += offsetFinalX*scaleFinalX*scaleMandelX;
+						offsetMandelY += offsetFinalY*scaleFinalY*scaleMandelY;
+						scaleMandelX *= scaleFinalX;
+						scaleMandelY *= scaleFinalY;
+						
+						// and reset the final transform
+						scaleFinalX = 1f;
+						scaleFinalY = 1f;
+						offsetFinalX = 0f;
+						offsetFinalY = 0f;
+						
+						scaleMandelUniform.set(scaleMandelX, scaleMandelY);
+						setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
+						
+						scaleFinalUniform.set(scaleFinalX, scaleFinalY);
+						offsetFinalUniform.set(offsetFinalX, offsetFinalY);
+						
+						// Reactivate final drawing and run the mandel pass once
+						resetVertexMosaic();
+						mandelPass.setSilent(false);
+					}
 					
-					// and reset the final transform
-					scaleFinalX = 1f;
-					scaleFinalY = 1f;
-					offsetFinalX = 0f;
-					offsetFinalY = 0f;
-					
-					scaleMandelUniform.set(scaleMandelX, scaleMandelY);
-					setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
-					
-					scaleFinalUniform.set(scaleFinalX, scaleFinalY);
-					offsetFinalUniform.set(offsetFinalX, offsetFinalY);
-					
-					// Reactivate final drawing and run the mandel pass once
-					mandelPass.setSilent(false);
-					finalPass.setSilent(false);
-					clearPass.setSilent(false);
+					setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
 				}
 			
 			return true;
 		}
 		
 		return false;
+	}
+	
+	private void drawFinalToFboOnce() {
+		// TODO: Many race conditions here that could lock the code
+		
+		// Draw the scaled final image into the fbo once
+		FBO clearFBO = clearPass.getFbo();
+		FBO finalFBO = finalPass.getFbo();
+		SetListener waitForIt = new SetListener(null);
+		synchronized (model.getRenderPasses()) {
+			finalPass.setOnRenderPassFinishedListener(new SetListener(finalFBO, waitForIt));
+		}
+		while(finalPass.getOnRenderPassFinishedListener() != waitForIt) Thread.yield();
+		finalPass.setOnRenderPassFinishedListener(null);
+		synchronized (model.getRenderPasses()) {
+			clearFBO = clearPass.getFbo();
+			finalFBO = finalPass.getFbo();
+			
+			clearPass.setFbo(mandelFBO2);
+			finalPass.setFbo(mandelFBO2);
+			clearPass.setOnRenderPassFinishedListener(new SetListener(clearFBO));
+			finalPass.setOnRenderPassFinishedListener(new SetListener(finalFBO, waitForIt));
+		}
+		while(finalPass.getOnRenderPassFinishedListener() != waitForIt) Thread.yield();
+		finalPass.setOnRenderPassFinishedListener(null);
+		synchronized (model.getRenderPasses()) {
+			List<RenderPass> renderPasses = model.getRenderPasses();
+			renderPasses.clear();
+			mandelFbo2toFboPass.setFbo(mandelFBO);
+			mandelFbo2toFboPass.setOnRenderPassFinishedListener(new SetListener(mandelFBO2));
+			renderPasses.add(new ClearPass(GLES20.GL_COLOR_BUFFER_BIT, mandelFBO));
+			renderPasses.add(mandelFbo2toFboPass);
+		}
+		while(mandelFbo2toFboPass.getFbo() != mandelFBO2) Thread.yield();
+		setRenderPasses();
+	}
+	
+	private class SetListener implements OnRenderPassFinishedListener {
+		private FBO fbo;
+		private SetListener listener;
+		
+		public SetListener(FBO fbo) {
+			this(fbo, null);
+		}
+		
+		public SetListener(FBO fbo, SetListener listener) {
+			this.fbo = fbo;
+			if(listener != this)
+				this.listener = listener;
+			else
+				this.listener = null;
+		}
+		
+		@Override
+		public void onRenderPassFinished(
+				RenderPass pass) {
+			pass.setFbo(fbo);
+			if(listener != null)
+				pass.setOnRenderPassFinishedListener(listener);
+		}
 	}
 	
 	@Override
@@ -396,6 +480,7 @@ CheckGlErrorPass.OnGlErrorListener {
 	public void onStopTrackingTouch(SeekBar arg0) {
 		if(arg0.getId() == R.id.iterSeekBar) {
 			maxInterationsUniform.set(arg0.getProgress());
+			resetVertexMosaic();
 			mandelPass.setSilent(false);
 		}
 	}
@@ -462,9 +547,24 @@ CheckGlErrorPass.OnGlErrorListener {
 		setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
 		setScaleMandelUniform(scale);
 		renderMode = RenderMode.SINGLE;
+		setRenderMode(renderMode);
 		maxInterationsUniform.set(40);
+		((SeekBar)findViewById(R.id.iterSeekBar)).setProgress(
+				(int) maxInterationsUniform.getFloats()[0]);
 		
+		findViewById(R.id.renderModeRadioGroup).setVisibility(View.GONE);
+		((RadioButton)findViewById(R.id.radioS)).setChecked(true);
+		((CheckBox)findViewById(R.id.checkBox1)).setChecked(false);
+		renderMosaic = false;
+		setRenderPasses();
+		setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
+		resetVertexMosaic();
 		mandelPass.setSilent(false);
+	}
+	
+	public void setRenderMosaic(View view) {
+		renderMosaic = ((CheckBox)view).isChecked();
+		setRenderPasses();
 	}
 
 	private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
@@ -492,11 +592,41 @@ CheckGlErrorPass.OnGlErrorListener {
 		
 		@Override
 		public boolean onDoubleTap(MotionEvent e) {
+			
+			// Only do this if render mosaic is used
+			if(renderMosaic && (renderMode == RenderMode.SINGLE_IN_VERTEX || renderMode == RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX)) {
+				float oldOffsetFinalX = offsetFinalX;
+				float oldOffsetFinalY = offsetFinalY;
+				float oldScaleFinalX = scaleFinalX;
+				float oldScaleFinalY = scaleFinalY;
+				
+				// Temporarily change final
+				offsetFinalX += 2*scaleFinalX*(e.getX()/view.getWidth()*2 -1);
+				offsetFinalY -= 2*scaleFinalY*(e.getY()/view.getHeight()*2 -1);
+				scaleFinalX /= 2;
+				scaleFinalY /= 2;
+				scaleFinalUniform.set(scaleFinalX, scaleFinalY);
+				offsetFinalUniform.set(offsetFinalX, offsetFinalY);
+				
+				drawFinalToFboOnce();
+				
+				// Reset final
+				offsetFinalX = oldOffsetFinalX;
+				offsetFinalY = oldOffsetFinalY;
+				scaleFinalX = oldScaleFinalX;
+				scaleFinalY = oldScaleFinalY;
+				offsetFinalUniform.set(offsetFinalX, offsetFinalY);
+				scaleFinalUniform.set(scaleFinalX, scaleFinalY);
+			}
+			
+			// Do the changes to mandel instead of final
 			offsetMandelX += scaleMandelX*(e.getX()/view.getWidth()*2 -1);
 			offsetMandelY -= scaleMandelY*(e.getY()/view.getHeight()*2 -1);
 			scaleMandelX /= 2;
 			scaleMandelY /= 2;
 			scaleMandelUniform.set(scaleMandelX, scaleMandelY);
+						
+			setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
 			return true;
 		}
 		
@@ -520,11 +650,18 @@ CheckGlErrorPass.OnGlErrorListener {
 		// TODO: Are we leaking video memory here when we loose the old FBO?
 		mandelFBO = new FBO(mandelTexture, view.getWidth(), view.getHeight());
 		
+		// This pass can copy mandelFBO2 back to mandelFBO
+		Texture mandelTexture2 = new Texture(null, Texture.TextureType.TEXTURE_2D, view.getWidth(),
+				view.getHeight(), Texture.TexelType.UBYTE, Texture.Format.GL_RGB, Texture.Filter.NEAREST,
+				Texture.WrapMode.CLAMP_TO_EDGE);
+		mandelFBO2 = new FBO(mandelTexture2, view.getWidth(), view.getHeight());
+		Material directMaterial = new Material(ShaderLoader.loadShaderProgram(R.raw.direct_v, R.raw.direct_f));
+		directMaterial.addTexture("tex", mandelTexture2);
+		mandelFbo2toFboPass = new QuadRenderPass(directMaterial, mandelFBO);
+		
 		// Initialize the pixelMesh
 		Node vertexRootNode = new Node();
-		mandelVertexPass = new SceneRenderPass(vertexRootNode,
-				/*Ignored dummy camera*/ new CameraNode(asp, asp, asp, asp)/*,
-				mandelFBO*/);
+		mandelVertexPass.setRootNode(vertexRootNode);
 		mandelVertexPass.setOneTime(true);
 		
 		final int maxShort = 256*256-1;
@@ -543,6 +680,69 @@ CheckGlErrorPass.OnGlErrorListener {
 		int parts = (int)Math.ceil((float)fullH/h);
 		
 		
+		// Generate a pixel mesh of size h*w and the resolution that corresponds
+		// a full size view of w*fullH points
+		Geometry fullShortPixelMesh = generatePixelMeshGeometry(w, h, w, fullH);
+		
+		// Add multiple pieces
+		for(int p = 0; p < parts; p++) {
+			GeometryNode pixelGeometryNode = new GeometryNode(fullShortPixelMesh, mandelMaterial);
+			pixelGeometryNode.getTransform().getPosition().setY(2*p/(float)parts);
+			vertexRootNode.attach(pixelGeometryNode);
+		}
+		
+		// Create the vertex mosaic pass
+		Node vertexMosaicRootNode = new Node();
+		mandelVertexMosaicPass.setRootNode(vertexMosaicRootNode);
+		setUpVertexMosaic(vertexMosaicRootNode, view.getWidth(), view.getHeight(), 32);
+		
+		finalMaterial = new Material(finalShaderProg);
+		finalMaterial.addTexture("tex", mandelTexture);
+		finalMaterial.addUniform(offsetFinalUniform);
+		finalMaterial.addUniform(scaleFinalUniform);
+		
+		setRenderPasses();
+	}
+	
+	private void setUpVertexMosaic(Node rootNode, int width,
+			int height, int partSize) {
+		rootNode.getChildren().clear();
+		
+		Geometry part = generatePixelMeshGeometry(partSize, partSize, width, height);
+		
+		int partsX = (int) Math.ceil(width/(float)partSize);
+		int partsY = (int) Math.ceil(height/(float)partSize);
+		
+		for(int j = 0; j < partsY; j++) {
+			for(int i = 0; i < partsX; i++) {
+				GeometryNode gNode = new GeometryNode(part, mandelMaterial);
+				gNode.setVisible(false);
+				
+				float posX = 2*i/(float)partsX;
+				float posY = 2*j/(float)partsY;
+				
+				gNode.getTransform().getPosition().set(posX, posY, 0);
+				
+				rootNode.attach(gNode);
+			}
+		}
+		
+		// Make a single GeometryNode visible too bootstrap the piecewise drawing
+		resetVertexMosaic();
+	}
+	
+	private void resetVertexMosaic() {
+		if(mandelVertexMosaicPass != null) {
+			Node rootNode = mandelVertexMosaicPass.getRootNode();
+			if(rootNode != null) {
+				Set<Node> children = rootNode.getChildren();
+				if(!children.isEmpty() && children.toArray()[0] instanceof GeometryNode)
+					((GeometryNode)children.toArray()[0]).setVisible(true);
+			}
+		}
+	}
+
+	private Geometry generatePixelMeshGeometry(int w, int h, int fullW, int fullH) {
 		ShortBuffer indices = ShortBuffer.allocate(w*h);
 		Geometry.Attribute posAt = new Geometry.Attribute();
 		posAt.name = "position";
@@ -552,7 +752,7 @@ CheckGlErrorPass.OnGlErrorListener {
 		
 		for(int i = 0; i < h; i++) {
 			for(int j = 0; j < w; j++) {
-				((FloatBuffer) posAt.buffer).put(-1 + (2*j + 1)/(float)w);
+				((FloatBuffer) posAt.buffer).put(-1 + (2*j + 1)/(float)fullW);
 				((FloatBuffer) posAt.buffer).put(-1 + (2*i + 1)/(float)fullH);
 				((FloatBuffer) posAt.buffer).put(0);
 				
@@ -564,24 +764,9 @@ CheckGlErrorPass.OnGlErrorListener {
 		
 		List<Geometry.Attribute> lat = new ArrayList<Geometry.Attribute>();
 		lat.add(posAt);
-		Geometry pixelMesh = new Geometry(Geometry.PrimitiveType.POINTS, indices, lat);
-		
-		// Add multiple pieces
-		for(int p = 0; p < parts; p++) {
-			GeometryNode pixelGeometryNode = new GeometryNode(pixelMesh, mandelMaterial);
-			pixelGeometryNode.getTransform().getPosition().setY(2*p/(float)parts);
-			vertexRootNode.attach(pixelGeometryNode);
-		}
-		
-		
-		finalMaterial = new Material(finalShaderProg);
-		finalMaterial.addTexture("tex", mandelTexture);
-		finalMaterial.addUniform(offsetFinalUniform);
-		finalMaterial.addUniform(scaleFinalUniform);
-		
-		setRenderPasses();
+		return new Geometry(Geometry.PrimitiveType.POINTS, indices, lat);
 	}
-	
+
 	private void setRenderPasses() {
 		synchronized (model.getRenderPasses()) {
 			model.getRenderPasses().clear();
@@ -589,6 +774,8 @@ CheckGlErrorPass.OnGlErrorListener {
 			model.addRenderPass(clearPass);
 			setCorrectMandelPass();
 			mandelVertexPass.setFbo(mandelFBO);
+			mandelVertexMosaicPass.setOnRenderPassFinishedListener(this);
+			mandelVertexMosaicPass.setFbo(mandelFBO);
 			mandelPass.setOneTime(true);
 			mandelPass.setSilent(false);
 			model.addRenderPass(mandelPass);
@@ -602,8 +789,13 @@ CheckGlErrorPass.OnGlErrorListener {
 	
 	private void setCorrectMandelPass() {
 		if(renderMode == RenderMode.SINGLE_IN_VERTEX ||
-				renderMode == RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX)
-			mandelPass = mandelVertexPass;
+				renderMode == RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX) {
+			if(renderMosaic) {
+				mandelPass = mandelVertexMosaicPass;
+			}
+			else
+				mandelPass = mandelVertexPass;
+		}
 		else
 			mandelPass = new QuadRenderPass(mandelMaterial, mandelFBO);
 	}
@@ -635,6 +827,65 @@ CheckGlErrorPass.OnGlErrorListener {
 			outOfMemToast.show();
 		else
 			otherGlErrorToast.show();
+	}
+	
+	private void setPosInfo(double x, double y, double scaleX, double scaleY) {
+		double s;
+		if(scaleX < scaleY)
+			s = scaleX;
+		else
+			s = scaleY;
+		
+		String scaleString = String.valueOf(/*1/*/s);
+		posTextView.setText("Position: " + 2*x + " + " + 
+				2*y + "i\nScale: " + scaleString/* + "x"*/);
+	}
+
+	@Override
+	public void onRenderPassFinished(RenderPass pass) {
+		if(pass == mandelVertexMosaicPass) {
+			Set<Node> parts = ((SceneRenderPass)pass).getRootNode().getChildren();
+			
+			Iterator<Node> it = parts.iterator();
+			
+			// TODO: If unexpected nodes are added result is undefined
+			
+			// Find the first visible GeometryNode
+			while(it.hasNext()) {
+				Node node = it.next();
+				if(node instanceof GeometryNode) {
+					GeometryNode gNode = (GeometryNode) node;
+					if(gNode.isVisible()) {
+						gNode.setVisible(false);
+						break;
+					}
+				}
+			}
+			
+			// If that was the last Node we are finished
+			if(!it.hasNext()) {
+				// Set a GeometryNode to visible to have somewhere to start next time
+				resetVertexMosaic();
+				doneToast.show();
+				return;
+			}
+			
+			// Otherwise set the next GeometryNode to visible
+			Node node = it.next();
+			if(node instanceof GeometryNode)
+				((GeometryNode)node).setVisible(true);
+			
+			// Set the remaining GeometryNodes to not visible
+			while(it.hasNext()) {
+				Node node2 = it.next();
+				if(node2 instanceof GeometryNode)
+					((GeometryNode)node2).setVisible(false);
+			}
+			
+			// Since there were more GeometryNodes let's redraw
+			pass.setSilent(false);
+			
+		}
 	}
 }
 

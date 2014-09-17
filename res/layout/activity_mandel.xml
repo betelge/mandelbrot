@@ -35,13 +35,13 @@
                 android:id="@+id/iterSeekBar"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
-
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/linearLayout"
             android:layout_width="match_parent"
             android:layout_height="fill_parent"
+            android:layout_weight="1"
             android:gravity="right" >
 
             <RadioGroup
@@ -81,6 +81,14 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Emulate double precision in vertex shader" />
+
+                <CheckBox
+                    android:id="@+id/checkBox1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:onClick="setRenderMosaic"
+                    android:text="Use mosiac for vertex mode" />
+
             </RadioGroup>
 
             <LinearLayout
@@ -105,9 +113,17 @@
                     android:layout_gravity="right"
                     android:onClick="resetPos"
                     android:text="Reset" />
-
             </LinearLayout>
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/posTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@color/settingsBackground"
+            android:text="Position:\nZoom:"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="?android:attr/textColorPrimaryDisableOnly" />
 
     </LinearLayout>
 
