@@ -113,6 +113,25 @@
                     android:layout_gravity="right"
                     android:onClick="resetPos"
                     android:text="Reset" />
+
+                <Button
+                    android:id="@+id/button3"
+                    style="?android:attr/buttonStyleSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right"
+                    android:onClick="hideHUD"
+                    android:text="Hide" />
+
+                <Button
+                    android:id="@+id/button4"
+                    style="?android:attr/buttonStyleSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right"
+                    android:onClick="saveImage"
+                    android:text="Save" />
+
             </LinearLayout>
         </LinearLayout>
 
@@ -126,5 +145,15 @@
             android:textColor="?android:attr/textColorPrimaryDisableOnly" />
 
     </LinearLayout>
+
+    <Button
+        android:id="@+id/showButton"
+        style="?android:attr/buttonStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:onClick="showHUD"
+        android:text="Options"
+        android:visibility="gone" />
 
 </FrameLayout>

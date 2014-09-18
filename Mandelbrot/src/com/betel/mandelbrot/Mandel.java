@@ -1,8 +1,10 @@
 package com.betel.mandelbrot;
 
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -11,7 +13,6 @@ import utils.ShaderLoader;
 import utils.StringLoader;
 import betel.alw3d.Alw3dModel;
 import betel.alw3d.Alw3dView;
-import betel.alw3d.math.Vector3f;
 import betel.alw3d.renderer.CameraNode;
 import betel.alw3d.renderer.FBO;
 import betel.alw3d.renderer.Geometry;
@@ -19,7 +20,6 @@ import betel.alw3d.renderer.GeometryNode;
 import betel.alw3d.renderer.Material;
 import betel.alw3d.renderer.Node;
 import betel.alw3d.renderer.QuadRenderPass;
-import betel.alw3d.renderer.RenderMultiPass;
 import betel.alw3d.renderer.ShaderProgram;
 import betel.alw3d.renderer.Texture;
 import betel.alw3d.renderer.Uniform;
@@ -28,31 +28,30 @@ import betel.alw3d.renderer.passes.ClearPass;
 import betel.alw3d.renderer.passes.RenderPass;
 import betel.alw3d.renderer.passes.SceneRenderPass;
 import betel.alw3d.renderer.passes.RenderPass.OnRenderPassFinishedListener;
-import android.support.v7.app.ActionBarActivity;
-import android.text.Editable;
+import android.annotation.SuppressLint;
 import android.app.AlertDialog;
-import android.app.AlertDialog.Builder;
 import android.content.DialogInterface;
+import android.graphics.Bitmap;
 import android.opengl.GLES20;
+import android.opengl.GLException;
 import android.os.Bundle;
-import android.util.Log;
+import android.support.v7.app.ActionBarActivity;
 import android.view.GestureDetector;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.View.OnLayoutChangeListener;
 import android.view.View.OnTouchListener;
+import android.view.WindowManager;
 import android.widget.CheckBox;
+import android.widget.NumberPicker;
 import android.widget.RadioButton;
 import android.widget.RadioGroup.OnCheckedChangeListener;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
-import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.NumberPicker;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -122,6 +121,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	private TextView posTextView;
 	
+	private Bitmap screenshotBitmap;
+	
 	static public enum RenderMode {
 		SINGLE(0x001),
 		EMULATED_DOUBLE(0x002),
@@ -140,9 +141,15 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		}
 	}
 
+	@SuppressLint("ShowToast")
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		
+		// Hide status bar and action bar
+		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+	            WindowManager.LayoutParams.FLAG_FULLSCREEN);
+		getSupportActionBar().hide();
 		
 		StringLoader.setContext(this);
 		
@@ -220,15 +227,25 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		    
 		    int hudVisibility = savedInstanceState.getInt(HUD);
 		    View hudView = findViewById(R.id.HUD);
-		    if(hudView != null)
+		    View showButton = findViewById(R.id.showButton);
+		    if(hudView != null) {
 		    	hudView.setVisibility(hudVisibility);
+		    	if(hudVisibility == View.VISIBLE)
+		    		showButton.setVisibility(View.GONE);
+		    	else
+		    		showButton.setVisibility(View.VISIBLE);
+		    }
+		    
 		}
 		else {
-			findViewById(R.id.HUD).setVisibility(View.GONE);
-			findViewById(R.id.linearLayout).findViewById(
+			//findViewById(R.id.HUD).setVisibility(View.GONE);
+			/*findViewById(R.id.linearLayout).findViewById(
 					R.id.renderModeRadioGroup).setVisibility(
-							View.GONE);
+							View.GONE);*/
 		}
+		findViewById(R.id.linearLayout).findViewById(
+				R.id.renderModeRadioGroup).setVisibility(
+						View.GONE);
 		
 		posTextView = (TextView) findViewById(R.id.posTextView);
 		setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
@@ -283,7 +300,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	@Override
 	public void onRestart() {
 		super.onRestart();
-		mandelPass.setSilent(false);
+		if(mandelPass != null)
+			mandelPass.setSilent(false);
 	}
 	
 	@Override
@@ -565,6 +583,36 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	public void setRenderMosaic(View view) {
 		renderMosaic = ((CheckBox)view).isChecked();
 		setRenderPasses();
+	}
+	
+	public void showHUD(View view) {
+		findViewById(R.id.showButton).setVisibility(View.GONE);
+		findViewById(R.id.HUD).setVisibility(View.VISIBLE);
+	}
+	
+	public void hideHUD(View view) {
+		findViewById(R.id.HUD).setVisibility(View.GONE);
+		findViewById(R.id.showButton).setVisibility(View.VISIBLE);
+	}
+	
+	public void saveImage(View view) {
+		screenshotBitmap = null;
+		synchronized (model.getRenderPasses()) {
+			model.getRenderPasses().add(new ScreenshotPass());
+		}
+		Calendar cal = Calendar.getInstance();
+		long time = cal.getTimeInMillis();
+		
+		while (screenshotBitmap == null && time < cal.getTimeInMillis() + 5000)
+			Thread.yield();
+		
+		if(screenshotBitmap == null)
+			Utils.displayFileError(this);
+		else {
+			Utils.saveBitmapToFile(this, screenshotBitmap);
+			screenshotBitmap.recycle();
+			screenshotBitmap = null;
+		}
 	}
 
 	private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
@@ -885,6 +933,50 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			// Since there were more GeometryNodes let's redraw
 			pass.setSilent(false);
 			
+		}
+	}
+	
+	public class ScreenshotPass extends RenderPass {
+		
+		public ScreenshotPass() {
+			super();
+			this.setOnRenderPassFinishedListener(new ScreenshotRetriever());
+			this.setOneTime(true);
+		}
+		
+		public class ScreenshotRetriever implements OnRenderPassFinishedListener {
+			@Override
+			public void onRenderPassFinished(RenderPass pass) {
+				screenshotBitmap = createBitmapFromGLSurface(0, 0, view.getWidth(), view.getHeight());
+			}
+		}
+		
+		private Bitmap createBitmapFromGLSurface(int x, int y, int w, int h)
+		        throws OutOfMemoryError {
+		    int bitmapBuffer[] = new int[w * h];
+		    int bitmapSource[] = new int[w * h];
+		    IntBuffer intBuffer = IntBuffer.wrap(bitmapBuffer);
+		    intBuffer.position(0);
+
+		    try {
+		        GLES20.glReadPixels(x, y, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, intBuffer);
+		        int offset1, offset2;
+		        for (int i = 0; i < h; i++) {
+		            offset1 = i * w;
+		            offset2 = (h - i - 1) * w;
+		            for (int j = 0; j < w; j++) {
+		                int texturePixel = bitmapBuffer[offset1 + j];
+		                int blue = (texturePixel >> 16) & 0xff;
+		                int red = (texturePixel << 16) & 0x00ff0000;
+		                int pixel = (texturePixel & 0xff00ff00) | red | blue;
+		                bitmapSource[offset2 + j] = pixel;
+		            }
+		        }
+		    } catch (GLException e) {
+		        return null;
+		    }
+
+		    return Bitmap.createBitmap(bitmapSource, w, h, Bitmap.Config.ARGB_8888);
 		}
 	}
 }
