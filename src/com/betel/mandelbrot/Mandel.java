@@ -70,6 +70,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private Material mandelMaterial;
 	private RenderMode renderMode = RenderMode.SINGLE;
 	private boolean renderMosaic = false;
+	private int colorShader;
 	private ShaderProgram mandelShaderProg;
 	private ShaderProgram mandel64ShaderProg;
 	private ShaderProgram mandel64ExpShaderProg;
@@ -85,6 +86,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	static final private String SPLITTER = "splitter";
 	static final private String MAX_ITER = "maxIter";
 	static final private String RENDER_MODE = "renderMode";
+	static final private String COLOR_MODE = "colorMode";
 	static final private String HUD = "HUD";
 	private Uniform scaleMandelUniform;
 	private Uniform offsetMandelUniform;
@@ -153,11 +155,9 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		
 		StringLoader.setContext(this);
 		
-		mandelShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel_v, R.raw.mandel_f);
-		mandel64ShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel64_v, R.raw.mandel64_f);
-		mandel64ExpShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel64exp_v, R.raw.mandel64exp_f);
-		mandelInVertexShader = ShaderLoader.loadShaderProgram(R.raw.mandel_in_vertex_v, R.raw.mandel_in_vertex_f);
-		mandel64InVertexShader = ShaderLoader.loadShaderProgram(R.raw.mandel64exp_in_vert_v, R.raw.mandel64exp_in_vert_f);
+		// Load shaders
+		colorShader = R.raw.smoothhsvcolor;
+		loadShaders(colorShader);
 		mandelMaterial = new Material(mandelShaderProg);
 		
 		maxInterationsUniform = new Uniform("MAX_ITER", 40f);
@@ -183,7 +183,6 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		gestureDetector = new GestureDetector(this, new GestureListener());
 		
 		
-		finalShaderProg = ShaderLoader.loadShaderProgram(R.raw.final_v, R.raw.final_f);
 		offsetFinalUniform = new Uniform("offset", offsetFinalX, offsetFinalY);
 		scaleFinalUniform = new Uniform("scale", scaleFinalX, scaleFinalY);
 		
@@ -212,6 +211,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		View tempView = findViewById(R.id.linearLayout);
 		RadioGroup renderModeRadioGroup = (RadioGroup)tempView.findViewById(R.id.renderModeRadioGroup);
 		renderModeRadioGroup.setOnCheckedChangeListener(this);
+		RadioGroup colorRadioGroup = (RadioGroup)tempView.findViewById(R.id.colorRadioGroup);
+		colorRadioGroup.setOnCheckedChangeListener(this);
 		
 		if(savedInstanceState != null) {
 			offsetMandelX = savedInstanceState.getDouble(OFFSET_X);
@@ -224,6 +225,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		    maxInterationsUniform.set(savedInstanceState.getFloat(MAX_ITER));
 		    
 		    renderMode = (RenderMode) savedInstanceState.getSerializable(RENDER_MODE);
+		    colorShader = savedInstanceState.getInt(COLOR_MODE);
 		    
 		    int hudVisibility = savedInstanceState.getInt(HUD);
 		    View hudView = findViewById(R.id.HUD);
@@ -246,13 +248,32 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		findViewById(R.id.linearLayout).findViewById(
 				R.id.renderModeRadioGroup).setVisibility(
 						View.GONE);
+		findViewById(R.id.linearLayout).findViewById(
+				R.id.colorRadioGroup).setVisibility(
+						View.GONE);
 		
 		posTextView = (TextView) findViewById(R.id.posTextView);
 		setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
 		
+		loadShaders(colorShader);
 		setRenderMode(renderMode);
 	}
 	
+	private void loadShaders(int colorShader) {
+		mandelShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel_v, R.raw.mandel_f,
+				null, new int[]{R.raw.packfloat, R.raw.hsv2rgb, colorShader});
+		mandel64ShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel64_v, R.raw.mandel64_f,
+				null, new int[]{R.raw.packfloat, R.raw.hsv2rgb, colorShader});
+		mandel64ExpShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel64exp_v, R.raw.mandel64exp_f,
+				null, new int[]{R.raw.packfloat, R.raw.doubleemulation, R.raw.hsv2rgb, colorShader});
+		mandelInVertexShader = ShaderLoader.loadShaderProgram(R.raw.mandel_in_vertex_v, R.raw.mandel_in_vertex_f,
+				new int[]{R.raw.packfloat, R.raw.hsv2rgb, colorShader}, null);
+		mandel64InVertexShader = ShaderLoader.loadShaderProgram(R.raw.mandel64exp_in_vert_v, R.raw.mandel64exp_in_vert_f,
+				new int[]{R.raw.doubleemulation, R.raw.hsv2rgb, colorShader}, null);
+		
+		finalShaderProg = ShaderLoader.loadShaderProgram(R.raw.final_v, R.raw.final_f);
+	}
+
 	private void setRenderMode(RenderMode renderMode) {
 		switch(renderMode) {
 		case SINGLE:
@@ -291,6 +312,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		savedInstanceState.putFloat(MAX_ITER, maxInterationsUniform.getFloats()[0]);
 		
 		savedInstanceState.putSerializable(RENDER_MODE, renderMode);
+		savedInstanceState.putInt(COLOR_MODE, colorShader);
 		
 		savedInstanceState.putInt(HUD, findViewById(R.id.HUD).getVisibility());
 		
@@ -505,50 +527,72 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 
 	@Override
 	public void onCheckedChanged(RadioGroup arg0, int arg1) {
-		if(arg0.getId() != R.id.renderModeRadioGroup) return;
+		if(arg0.getId() == R.id.renderModeRadioGroup) {
 		
-		switch(arg0.getCheckedRadioButtonId()) {
-		case R.id.radioS:
-			renderMode = RenderMode.SINGLE;
-			setRenderMode(renderMode);
-			setRenderPasses();
-			mandelPass.setSilent(false);
-			break;
-		case R.id.radioED:
-			renderMode = RenderMode.EMULATED_DOUBLE;
-			setRenderMode(renderMode);
-			setRenderPasses();
-	        mandelPass.setSilent(false);
-			break;
-		case R.id.radioExpED:
-			renderMode = RenderMode.EXP_EMULATED_DOUBLE;
-			setRenderMode(renderMode);
-			setRenderPasses();
-	        mandelPass.setSilent(false);
-	        break;
-		case R.id.radioSV:
-			renderMode = RenderMode.SINGLE_IN_VERTEX;
-			setRenderMode(renderMode);
-			setRenderPasses();
-			mandelPass.setSilent(false);
-			break;
-		case R.id.radioEDV:
-			renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
-			setRenderMode(renderMode);
-			setRenderPasses();
-			mandelPass.setSilent(false);
-			break;
-		default:
-			renderMode = RenderMode.SINGLE;
-			setRenderMode(renderMode);
-			setRenderPasses();
-			mandelPass.setSilent(false);
-			break;
+			switch(arg0.getCheckedRadioButtonId()) {
+			case R.id.radioS:
+				renderMode = RenderMode.SINGLE;
+				break;
+			case R.id.radioED:
+				renderMode = RenderMode.EMULATED_DOUBLE;
+				break;
+			case R.id.radioExpED:
+				renderMode = RenderMode.EXP_EMULATED_DOUBLE;
+		        break;
+			case R.id.radioSV:
+				renderMode = RenderMode.SINGLE_IN_VERTEX;
+				break;
+			case R.id.radioEDV:
+				renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
+				break;
+			default:
+				renderMode = RenderMode.SINGLE;
+				break;
+			}
+			
+			synchronized (model.getRenderPasses()) {
+				resetVertexMosaic();
+				setRenderMode(renderMode);
+				setRenderPasses();
+				mandelPass.setSilent(false);
+			}
+			
+		} else if(arg0.getId() == R.id.colorRadioGroup) {
+			
+			switch(arg0.getCheckedRadioButtonId()) {
+			case R.id.huecircleRadio:
+				colorShader = R.raw.smoothhsvcolor;
+				break;
+			case R.id.blueyellowRadio:
+				colorShader = R.raw.blueyellowcolor;
+				break;
+			default:
+				colorShader = R.raw.smoothhsvcolor;
+				break;
+			}
+			
+			synchronized (model.getRenderPasses()) {
+				resetVertexMosaic();
+				loadShaders(colorShader);
+				setRenderMode(renderMode);
+				setRenderPasses();
+				mandelPass.setSilent(false);
+			}
 		}
 	}
 	
 	public void toggleModeSettings(View view) {
 		View group = findViewById(R.id.renderModeRadioGroup);
+		int vis = group.getVisibility();
+		if(vis == View.VISIBLE)
+			vis = View.GONE;
+		else
+			vis = View.VISIBLE;
+		group.setVisibility(vis);
+	}
+	
+	public void toggleColorSettings(View view) {
+		View group = findViewById(R.id.colorRadioGroup);
 		int vis = group.getVisibility();
 		if(vis == View.VISIBLE)
 			vis = View.GONE;
@@ -574,6 +618,9 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		((RadioButton)findViewById(R.id.radioS)).setChecked(true);
 		((CheckBox)findViewById(R.id.checkBox1)).setChecked(false);
 		renderMosaic = false;
+		findViewById(R.id.colorRadioGroup).setVisibility(View.GONE);
+		((RadioButton)findViewById(R.id.huecircleRadio)).setChecked(true);
+		colorShader = R.id.huecircleRadio;
 		setRenderPasses();
 		setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
 		resetVertexMosaic();
