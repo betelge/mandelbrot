@@ -10,7 +10,7 @@ varying vec2 pos;
 
 vec4 c;
 
-//const float split = 1025.;
+vec4 color(float value, float radius, float max);
 
 vec2 splitf(float a)
 {
@@ -160,16 +160,14 @@ void main()
 
 	int i;
 	int max = int(MAX_ITER);
-	vec2 radius2;
+	vec2 radius2 = vec2(0.);
 	for( i=0; i<max; i++ ) {
 		radius2 = ds_add(ds_mul(z.xy,z.xy), ds_mul(z.zw,z.zw));
 		if( radius2.x > 4.0) break;
 		z = iter(z);
 	}
 	
-	float speed2 = (i == max ? 0.0 : float(i)) / MAX_ITER;
-	
-	//speed2 = (40. + 1. - log(log(float(i)))/log(2.));
-	
-	gl_FragColor = vec4(speed2, speed2, 0.5, 1.0);
+	float speed2 = (i == max ? 0.0 : float(i));
+		
+	gl_FragColor = color(speed2, radius2.x, MAX_ITER);
 }

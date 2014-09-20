@@ -44,52 +44,103 @@
             android:layout_weight="1"
             android:gravity="right" >
 
-            <RadioGroup
-                android:id="@+id/renderModeRadioGroup"
-                android:layout_width="fill_parent"
+            <ScrollView
+                android:id="@+id/scrollView1"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1.91"
-                android:background="@color/settingsBackground" >
+                android:fillViewport="false" >
 
-                <RadioButton
-                    android:id="@+id/radioS"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true"
-                    android:text="Single precision (Default)" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical" >
 
-                <RadioButton
-                    android:id="@+id/radioED"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Emulate double precision" />
+                    <RadioGroup
+                        android:id="@+id/renderModeRadioGroup"
+                        android:layout_width="fill_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1.91"
+                        android:background="@color/settingsBackground" >
 
-                <RadioButton
-                    android:id="@+id/radioExpED"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Use experimental 64 bit shader" />
+                        <TextView
+                            android:id="@+id/TextView01"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Algorithm:"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorPrimaryDisableOnly" />
 
-                <RadioButton
-                    android:id="@+id/radioSV"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Single precision in vertex shader" />
+                        <RadioButton
+                            android:id="@+id/radioS"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:text="Single precision (Default)" />
 
-                <RadioButton
-                    android:id="@+id/radioEDV"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Emulate double precision in vertex shader" />
+                        <RadioButton
+                            android:id="@+id/radioExpED"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Emulate double precision" />
 
-                <CheckBox
-                    android:id="@+id/checkBox1"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:onClick="setRenderMosaic"
-                    android:text="Use mosiac for vertex mode" />
+                        <RadioButton
+                            android:id="@+id/radioED"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Old double emulation" />
 
-            </RadioGroup>
+                        <RadioButton
+                            android:id="@+id/radioSV"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Single precision in vertex shader" />
+
+                        <RadioButton
+                            android:id="@+id/radioEDV"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Emulate double precision in vertex shader" />
+
+                        <CheckBox
+                            android:id="@+id/checkBox1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:onClick="setRenderMosaic"
+                            android:text="Use mosiac for vertex mode" />
+                    </RadioGroup>
+
+                    <RadioGroup
+                        android:id="@+id/colorRadioGroup"
+                        android:layout_width="fill_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1.91"
+                        android:background="@color/settingsBackground" >
+
+                        <TextView
+                            android:id="@+id/textView1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Color:"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorPrimaryDisableOnly" />
+
+                        <RadioButton
+                            android:id="@+id/huecircleRadio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:text="Hue circle" />
+
+                        <RadioButton
+                            android:id="@+id/blueyellowRadio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Blue-yellow" />
+                    </RadioGroup>
+                </LinearLayout>
+
+            </ScrollView>
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -104,6 +155,14 @@
                     android:layout_gravity="right"
                     android:onClick="toggleModeSettings"
                     android:text="Modes" />
+
+                <Button
+                    android:id="@+id/button5"
+                    style="?android:attr/buttonStyleSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:onClick="toggleColorSettings"
+                    android:text="Colors" />
 
                 <Button
                     android:id="@+id/button2"
@@ -133,6 +192,7 @@
                     android:text="Save" />
 
             </LinearLayout>
+
         </LinearLayout>
 
         <TextView
