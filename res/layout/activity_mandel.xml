@@ -27,7 +27,7 @@
                 android:id="@+id/iterTextView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Iterations:"
+                android:text="Iterations: 40"
                 android:textAppearance="?android:attr/textAppearanceSmall"
                 android:textColor="?android:attr/textColorPrimaryDisableOnly" />
 
@@ -72,11 +72,18 @@
                             android:textColor="?android:attr/textColorPrimaryDisableOnly" />
 
                         <RadioButton
-                            android:id="@+id/radioS"
+                            android:id="@+id/radioA"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:checked="true"
-                            android:text="Single precision (Default)" />
+                            android:text="Auto" />
+
+                        <RadioButton
+                            android:id="@+id/radioS"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="false"
+                            android:text="Single precision" />
 
                         <RadioButton
                             android:id="@+id/radioExpED"
@@ -126,10 +133,16 @@
                             android:textColor="?android:attr/textColorPrimaryDisableOnly" />
 
                         <RadioButton
-                            android:id="@+id/huecircleRadio"
+                            android:id="@+id/pastelhsvRadio"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:checked="true"
+                            android:text="Pastel" />
+
+                        <RadioButton
+                            android:id="@+id/huecircleRadio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
                             android:text="Hue circle" />
 
                         <RadioButton
@@ -137,6 +150,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Blue-yellow" />
+
                     </RadioGroup>
                 </LinearLayout>
 
@@ -147,49 +161,58 @@
                 android:layout_height="match_parent"
                 android:orientation="vertical" >
 
-                <Button
-                    android:id="@+id/button1"
-                    style="?android:attr/buttonStyleSmall"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="right"
-                    android:onClick="toggleModeSettings"
-                    android:text="Modes" />
+                <ScrollView
+                    android:id="@+id/scrollView2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" >
 
-                <Button
-                    android:id="@+id/button5"
-                    style="?android:attr/buttonStyleSmall"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:onClick="toggleColorSettings"
-                    android:text="Colors" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical" >
 
-                <Button
-                    android:id="@+id/button2"
-                    style="?android:attr/buttonStyleSmall"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="right"
-                    android:onClick="resetPos"
-                    android:text="Reset" />
+                        <Button
+                            android:id="@+id/button1"
+                            style="?android:attr/buttonStyleSmall"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:onClick="toggleModeSettings"
+                            android:text="Modes" />
 
-                <Button
-                    android:id="@+id/button3"
-                    style="?android:attr/buttonStyleSmall"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="right"
-                    android:onClick="hideHUD"
-                    android:text="Hide" />
+                        <Button
+                            android:id="@+id/button5"
+                            style="?android:attr/buttonStyleSmall"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:onClick="toggleColorSettings"
+                            android:text="Colors" />
 
-                <Button
-                    android:id="@+id/button4"
-                    style="?android:attr/buttonStyleSmall"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="right"
-                    android:onClick="saveImage"
-                    android:text="Save" />
+                        <Button
+                            android:id="@+id/button2"
+                            style="?android:attr/buttonStyleSmall"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:onClick="resetPos"
+                            android:text="Reset" />
+
+                        <Button
+                            android:id="@+id/button3"
+                            style="?android:attr/buttonStyleSmall"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:onClick="hideHUD"
+                            android:text="Hide" />
+
+                        <Button
+                            android:id="@+id/button4"
+                            style="?android:attr/buttonStyleSmall"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:onClick="saveImage"
+                            android:text="Save" />
+                    </LinearLayout>
+
+                </ScrollView>
 
             </LinearLayout>
 

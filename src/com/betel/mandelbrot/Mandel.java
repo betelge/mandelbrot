@@ -36,6 +36,7 @@ import android.opengl.GLES20;
 import android.opengl.GLException;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
+import android.util.Log;
 import android.view.GestureDetector;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -87,6 +88,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	static final private String MAX_ITER = "maxIter";
 	static final private String RENDER_MODE = "renderMode";
 	static final private String COLOR_MODE = "colorMode";
+	static final private String RENDER_MOSAIC = "renderMosaic";
 	static final private String HUD = "HUD";
 	private Uniform scaleMandelUniform;
 	private Uniform offsetMandelUniform;
@@ -120,6 +122,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private Toast outOfMemToast;
 	private Toast otherGlErrorToast;
 	private Toast doneToast;
+	private Toast renderMosaicToast;
 	
 	private TextView posTextView;
 	
@@ -156,7 +159,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		StringLoader.setContext(this);
 		
 		// Load shaders
-		colorShader = R.raw.smoothhsvcolor;
+		colorShader = R.raw.pastelhsvcolor;
 		loadShaders(colorShader);
 		mandelMaterial = new Material(mandelShaderProg);
 		
@@ -193,6 +196,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		otherGlErrorToast = Toast.makeText(this,
 				"OpenGL error", Toast.LENGTH_SHORT);
 		doneToast = Toast.makeText(this, "Done", Toast.LENGTH_SHORT);
+		renderMosaicToast = Toast.makeText(this, "Auto-turning on render mosaic", Toast.LENGTH_SHORT);
 		
 		model = new Alw3dModel();
 		view = new Alw3dView(this, model);
@@ -220,12 +224,14 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		    setOffsetMandelUniforms(offsetFinalX, offsetFinalY);
 
 		    scale = savedInstanceState.getFloat(SCALE);
+		    setScaleMandelUniform(scale);
 		    
 		    splitterFloatUniform.set(savedInstanceState.getFloat(SPLITTER));
 		    maxInterationsUniform.set(savedInstanceState.getFloat(MAX_ITER));
 		    
 		    renderMode = (RenderMode) savedInstanceState.getSerializable(RENDER_MODE);
 		    colorShader = savedInstanceState.getInt(COLOR_MODE);
+		    renderMosaic = savedInstanceState.getBoolean(RENDER_MOSAIC);
 		    
 		    int hudVisibility = savedInstanceState.getInt(HUD);
 		    View hudView = findViewById(R.id.HUD);
@@ -254,6 +260,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		
 		posTextView = (TextView) findViewById(R.id.posTextView);
 		setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
+		
+		setAutoMode();
 		
 		loadShaders(colorShader);
 		setRenderMode(renderMode);
@@ -313,6 +321,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		
 		savedInstanceState.putSerializable(RENDER_MODE, renderMode);
 		savedInstanceState.putInt(COLOR_MODE, colorShader);
+		savedInstanceState.putBoolean(RENDER_MOSAIC, renderMosaic);
 		
 		savedInstanceState.putInt(HUD, findViewById(R.id.HUD).getVisibility());
 		
@@ -363,6 +372,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				public void onClick(DialogInterface dialog, int whichButton) {
 				  	int value = input.getValue();
 				  	maxInterationsUniform.set((float)value);
+				  	resetVertexMosaic();
 				  	mandelPass.setSilent(false);
 				}
 			});
@@ -383,6 +393,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				public void onClick(DialogInterface dialog, int whichButton) {
 				  	int value = input2.getValue();
 				  	splitterFloatUniform.set((float)value);
+				  	resetVertexMosaic();
 				  	mandelPass.setSilent(false);
 				}
 			});
@@ -425,6 +436,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 						
 						// Reactivate final drawing and run the mandel pass once
 						resetVertexMosaic();
+						setAutoMode();
 						mandelPass.setSilent(false);
 					}
 					
@@ -465,7 +477,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			renderPasses.clear();
 			mandelFbo2toFboPass.setFbo(mandelFBO);
 			mandelFbo2toFboPass.setOnRenderPassFinishedListener(new SetListener(mandelFBO2));
-			renderPasses.add(new ClearPass(GLES20.GL_COLOR_BUFFER_BIT, mandelFBO));
+			// This was probably causing the occasional black fill bug
+			//renderPasses.add(new ClearPass(GLES20.GL_COLOR_BUFFER_BIT, mandelFBO));
 			renderPasses.add(mandelFbo2toFboPass);
 		}
 		while(mandelFbo2toFboPass.getFbo() != mandelFBO2) Thread.yield();
@@ -503,11 +516,11 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		iterText.setText("Iterations: " + arg0.getProgress());
 		
 		// If in a simple mode change the fractal live
-		if(renderMode == RenderMode.SINGLE ||
+		/*if(renderMode == RenderMode.SINGLE ||
 				renderMode == RenderMode.SINGLE_IN_VERTEX) {
 			maxInterationsUniform.set(arg0.getProgress());
 			mandelPass.setSilent(false);
-		}
+		}*/
 	}
 
 	@Override
@@ -528,8 +541,14 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	@Override
 	public void onCheckedChanged(RadioGroup arg0, int arg1) {
 		if(arg0.getId() == R.id.renderModeRadioGroup) {
+			
+			if(arg0.getCheckedRadioButtonId() != R.id.radioA)
+				((RadioButton)findViewById(R.id.radioA)).setText("Auto");
 		
 			switch(arg0.getCheckedRadioButtonId()) {
+			case R.id.radioA:
+				setAutoMode();
+				break;
 			case R.id.radioS:
 				renderMode = RenderMode.SINGLE;
 				break;
@@ -550,37 +569,39 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				break;
 			}
 			
-			synchronized (model.getRenderPasses()) {
-				resetVertexMosaic();
-				setRenderMode(renderMode);
-				setRenderPasses();
-				mandelPass.setSilent(false);
-			}
+			fullRedraw();
 			
 		} else if(arg0.getId() == R.id.colorRadioGroup) {
 			
 			switch(arg0.getCheckedRadioButtonId()) {
 			case R.id.huecircleRadio:
-				colorShader = R.raw.smoothhsvcolor;
+				colorShader = R.raw.hsvcolor;
 				break;
 			case R.id.blueyellowRadio:
 				colorShader = R.raw.blueyellowcolor;
 				break;
+			case R.id.pastelhsvRadio:
+				colorShader = R.raw.pastelhsvcolor;
+				break;
 			default:
-				colorShader = R.raw.smoothhsvcolor;
+				colorShader = R.raw.pastelhsvcolor;
 				break;
 			}
 			
-			synchronized (model.getRenderPasses()) {
-				resetVertexMosaic();
-				loadShaders(colorShader);
-				setRenderMode(renderMode);
-				setRenderPasses();
-				mandelPass.setSilent(false);
-			}
+			loadShaders(colorShader);
+			fullRedraw();
 		}
 	}
 	
+	private void fullRedraw() {
+		synchronized (model.getRenderPasses()) {
+			resetVertexMosaic();
+			setRenderMode(renderMode);
+			setRenderPasses();
+			mandelPass.setSilent(false);
+		}
+	}
+
 	public void toggleModeSettings(View view) {
 		View group = findViewById(R.id.renderModeRadioGroup);
 		int vis = group.getVisibility();
@@ -615,12 +636,13 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				(int) maxInterationsUniform.getFloats()[0]);
 		
 		findViewById(R.id.renderModeRadioGroup).setVisibility(View.GONE);
-		((RadioButton)findViewById(R.id.radioS)).setChecked(true);
+		((RadioButton)findViewById(R.id.radioA)).setChecked(true);
+		setAutoMode();
 		((CheckBox)findViewById(R.id.checkBox1)).setChecked(false);
 		renderMosaic = false;
 		findViewById(R.id.colorRadioGroup).setVisibility(View.GONE);
-		((RadioButton)findViewById(R.id.huecircleRadio)).setChecked(true);
-		colorShader = R.id.huecircleRadio;
+		((RadioButton)findViewById(R.id.pastelhsvRadio)).setChecked(true);
+		colorShader = R.id.pastelhsvRadio;
 		setRenderPasses();
 		setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
 		resetVertexMosaic();
@@ -668,7 +690,11 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		    float factor = detector.getScaleFactor();
 		    scaleFinalX /= factor;
 		    scaleFinalY /= factor;
+		    scale /= factor;
+		    offsetFinalX *= factor;
+			offsetFinalY *= factor;
 		    scaleFinalUniform.set(scaleFinalX, scaleFinalY);
+		    offsetFinalUniform.set(offsetFinalX, offsetFinalY);
 		
 		    //invalidate();
 		    return true;
@@ -719,13 +745,66 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			offsetMandelY -= scaleMandelY*(e.getY()/view.getHeight()*2 -1);
 			scaleMandelX /= 2;
 			scaleMandelY /= 2;
+			scale /= 2;
 			scaleMandelUniform.set(scaleMandelX, scaleMandelY);
 						
 			setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
+			
+			setAutoMode();
 			return true;
 		}
 		
 		
+	}
+
+	private void setAutoMode() {
+		RadioButton radio = (RadioButton)findViewById(R.id.radioA);
+		if(radio.isChecked()) {
+			double scale = 1d;
+			if(scaleMandelX < scaleMandelY) scale = scaleMandelX;
+			else scale = scaleMandelY;
+			
+			double singleLimit = 0.2d;
+			double vertexSingleLimit = 0.00003d;
+			
+			if(scale < vertexSingleLimit) {
+				// We need double precision
+				if(renderMode != RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX) {
+					Toast.makeText(this, "Auto-switching to emulated double precision in vertex shader",
+							Toast.LENGTH_SHORT).show();
+					renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
+					if(maxInterationsUniform.getFloats()[0] <= 40)
+						renderMosaic = false;
+					fullRedraw();
+				}
+				radio.setText("Auto (Emu Double in Vert)");
+			}
+			
+			else if(scale < singleLimit) {
+				// We need vertex shader precision
+				if(renderMode != RenderMode.SINGLE_IN_VERTEX) {
+					Toast.makeText(this, "Auto-switching to vertex shader",
+							Toast.LENGTH_SHORT).show();
+					renderMode = RenderMode.SINGLE_IN_VERTEX;
+					if(maxInterationsUniform.getFloats()[0] <= 100)
+						renderMosaic = false;
+					fullRedraw();
+				}
+				radio.setText("Auto (In Vertex)");
+			}
+			
+			else {
+				// Normal fragment shader precision is enough
+				if(renderMode != RenderMode.SINGLE) {
+					Toast.makeText(this, "Auto-switching to fragment shader",
+							Toast.LENGTH_SHORT).show();
+					renderMode = RenderMode.SINGLE;
+					renderMosaic = false;
+					fullRedraw();
+				}
+				radio.setText("Auto (Single)");
+			}
+		}
 	}
 
 	@Override
@@ -734,6 +813,12 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		if(view.getHeight() == 0 || view.getWidth() == 0) return;
 		
 		// This will be done first after the view receives it's size in the layout.
+		
+		//Pause rendering while we do this
+		synchronized (model.getRenderPasses()) {
+			model.getRenderPasses().clear();
+			// The render passes will be reinitialized at the end of this method
+		}
 		
 		setScaleMandelUniform(scale);
 		setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
@@ -796,12 +881,27 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		finalMaterial.addUniform(offsetFinalUniform);
 		finalMaterial.addUniform(scaleFinalUniform);
 		
+		// Preload some stuff so it doesn't slow down the app later
+		Log.i(TAG, "Loading vertex geometry...");
+		view.requestPreload(vertexRootNode);
+		Log.i(TAG, "Loading vertex mosaic geometry...");
+		view.requestPreload(vertexMosaicRootNode);
+		Log.i(TAG, "Loading shaders...");
+		view.requestPreload(mandelShaderProg);
+		view.requestPreload(mandel64ShaderProg);
+		view.requestPreload(mandel64ExpShaderProg);
+		view.requestPreload(mandelInVertexShader);
+		view.requestPreload(mandel64InVertexShader);
+		view.requestPreload(finalMaterial);
+		Log.i(TAG, "Loading finished.");
+		
 		setRenderPasses();
 	}
 	
 	private void setUpVertexMosaic(Node rootNode, int width,
 			int height, int partSize) {
 		rootNode.getChildren().clear();
+		Log.d(TAG, "Creating vertex mosaic...");
 		
 		Geometry part = generatePixelMeshGeometry(partSize, partSize, width, height);
 		
@@ -824,6 +924,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		
 		// Make a single GeometryNode visible too bootstrap the piecewise drawing
 		resetVertexMosaic();
+		
+		Log.d(TAG, "Finished vertex mosaic.");
 	}
 	
 	private void resetVertexMosaic() {
@@ -918,8 +1020,18 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 
 	@Override
 	public void onGlError(int error) {
-		if(error == GLES20.GL_OUT_OF_MEMORY)
-			outOfMemToast.show();
+		if(error == GLES20.GL_OUT_OF_MEMORY) {
+			RadioButton rb = (RadioButton)findViewById(R.id.radioA);
+			if (rb != null) {
+				if(rb.isChecked() && !renderMosaic) {
+					renderMosaicToast.show();
+					renderMosaic = true;
+					fullRedraw();
+				}
+				else
+					outOfMemToast.show();
+			}
+		}
 		else
 			otherGlErrorToast.show();
 	}
