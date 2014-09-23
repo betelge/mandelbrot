@@ -38,7 +38,7 @@ public class Utils {
 	}
 	
 	public static void displayFileError(Activity activity) {
-		Toast.makeText(activity, "Can't write image to SD card", Toast.LENGTH_SHORT).show();
+		Toast.makeText(activity, "Can't write image to SD card", Toast.LENGTH_LONG).show();
 	}
 	
 	public static void displaySuccesToast(Activity activity) {
