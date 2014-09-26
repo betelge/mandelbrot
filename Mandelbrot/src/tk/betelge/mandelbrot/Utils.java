@@ -1,4 +1,4 @@
-package com.betel.mandelbrot;
+package tk.betelge.mandelbrot;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;

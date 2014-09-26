@@ -2,15 +2,6 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     xmlns:mandelbrot="http://schemas.android.com/apk/res-auto"
-    tools:context="com.betel.mandelbrot.Mandel" >
-
-    <item android:id="@+id/showHUD" android:orderInCategory="3" android:title="HUD" mandelbrot:showAsAction="ifRoom"></item>
-    <item android:id="@+id/chooseMaxIter" android:title="Choose maximum iteration" android:orderInCategory="30"/>
-    <item android:id="@+id/chooseSplitter" android:title="Choose splitter float" android:orderInCategory="40"/>
-    
-    
-    
-    
-    
+    tools:context="tk.betelge.mandelbrot.Mandel" >
 
 </menu>

@@ -1,6 +1,8 @@
 vec3 hsv2rgb(vec3 c);
 
 uniform float grad;
+uniform vec3 col1;
+uniform vec3 col2;
 
 vec4 color(float value, float radius, float max) {
 	float log2 = log(2.);
@@ -9,9 +11,12 @@ vec4 color(float value, float radius, float max) {
 	
 	float speed2 = log(value + smooth);
 	
-	vec3 hsv = vec3(grad*speed2, 1., 1.);
+	vec3 hsv = vec3(grad*speed2, 0.4, 1.);
 	
-	if(value == 0.) hsv.z = 0.;
+	float mod = abs(mod(grad*speed2, 2.) - 1.);
+	vec3 col = (1.-mod) * col1 + mod * col2;
 	
-	return vec4(hsv2rgb(hsv), 1.0);
+	if(value == 0.) col = vec3(0.);
+	
+	return vec4(col, 1.);
 }
