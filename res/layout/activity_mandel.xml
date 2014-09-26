@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:visibility="visible"
-    tools:context="com.betel.mandelbrot.Mandel" >
+    tools:context="tk.betelge.mandelbrot.Mandel" >
 
     <LinearLayout
         android:id="@+id/HUD"
@@ -27,7 +27,7 @@
                 android:id="@+id/iterTextView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Iterations: 40"
+                android:text="Iterations: 200"
                 android:textAppearance="?android:attr/textAppearanceSmall"
                 android:textColor="?android:attr/textColorPrimaryDisableOnly" />
 
@@ -110,12 +110,39 @@
                             android:text="Emulate double precision in vertex shader" />
 
                         <CheckBox
-                            android:id="@+id/checkBox1"
+                            android:id="@+id/mosaicBox"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:onClick="setRenderMosaic"
                             android:text="Use mosiac for vertex mode" />
                     </RadioGroup>
+
+                    <LinearLayout
+                        android:id="@+id/gradSettings"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1.91"
+                        android:background="@color/settingsBackground"
+                        android:orientation="vertical" >
+
+                        <TextView
+                            android:id="@+id/gradText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Gradient: 1"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorPrimaryDisableOnly" />
+
+                        <SeekBar
+                            android:id="@+id/gradBar"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:max="200"
+                            android:progress="50" />
+
+                    </LinearLayout>
 
                     <RadioGroup
                         android:id="@+id/colorRadioGroup"
@@ -144,6 +171,12 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Hue circle" />
+
+                        <RadioButton
+                            android:id="@+id/gradientRadio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Gradient" />
 
                         <RadioButton
                             android:id="@+id/blueyellowRadio"
@@ -188,6 +221,14 @@
                             android:text="Colors" />
 
                         <Button
+                            android:id="@+id/button6"
+                            style="?android:attr/buttonStyleSmall"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:onClick="toggleGradSettings"
+                            android:text="Grad" />
+
+                        <Button
                             android:id="@+id/button2"
                             style="?android:attr/buttonStyleSmall"
                             android:layout_width="match_parent"
@@ -217,6 +258,15 @@
             </LinearLayout>
 
         </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="0"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/posTextView"

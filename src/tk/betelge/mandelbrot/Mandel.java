@@ -1,36 +1,36 @@
-package com.betel.mandelbrot;
+package tk.betelge.mandelbrot;
 
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
+
+import tk.betelge.mandelbrot.R;
 
 import utils.ShaderLoader;
 import utils.StringLoader;
-import betel.alw3d.Alw3dModel;
-import betel.alw3d.Alw3dView;
-import betel.alw3d.renderer.CameraNode;
-import betel.alw3d.renderer.FBO;
-import betel.alw3d.renderer.Geometry;
-import betel.alw3d.renderer.GeometryNode;
-import betel.alw3d.renderer.Material;
-import betel.alw3d.renderer.Node;
-import betel.alw3d.renderer.QuadRenderPass;
-import betel.alw3d.renderer.ShaderProgram;
-import betel.alw3d.renderer.Texture;
-import betel.alw3d.renderer.Uniform;
-import betel.alw3d.renderer.passes.CheckGlErrorPass;
-import betel.alw3d.renderer.passes.ClearPass;
-import betel.alw3d.renderer.passes.RenderPass;
-import betel.alw3d.renderer.passes.SceneRenderPass;
-import betel.alw3d.renderer.passes.RenderPass.OnRenderPassFinishedListener;
+import tk.betelge.alw3d.Alw3dModel;
+import tk.betelge.alw3d.Alw3dView;
+import tk.betelge.alw3d.math.Vector3f;
+import tk.betelge.alw3d.renderer.CameraNode;
+import tk.betelge.alw3d.renderer.FBO;
+import tk.betelge.alw3d.renderer.Geometry;
+import tk.betelge.alw3d.renderer.GeometryNode;
+import tk.betelge.alw3d.renderer.Material;
+import tk.betelge.alw3d.renderer.Node;
+import tk.betelge.alw3d.renderer.QuadRenderPass;
+import tk.betelge.alw3d.renderer.ShaderProgram;
+import tk.betelge.alw3d.renderer.Texture;
+import tk.betelge.alw3d.renderer.Uniform;
+import tk.betelge.alw3d.renderer.Alw3dRenderer.OnSurfaceChangedListener;
+import tk.betelge.alw3d.renderer.passes.CheckGlErrorPass;
+import tk.betelge.alw3d.renderer.passes.ClearPass;
+import tk.betelge.alw3d.renderer.passes.RenderPass;
+import tk.betelge.alw3d.renderer.passes.SceneRenderPass;
+import tk.betelge.alw3d.renderer.passes.RenderPass.OnRenderPassFinishedListener;
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.opengl.GLES20;
 import android.opengl.GLException;
@@ -39,15 +39,12 @@ import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.Menu;
-import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
-import android.view.View.OnLayoutChangeListener;
 import android.view.View.OnTouchListener;
 import android.view.WindowManager;
 import android.widget.CheckBox;
-import android.widget.NumberPicker;
 import android.widget.RadioButton;
 import android.widget.RadioGroup.OnCheckedChangeListener;
 import android.widget.SeekBar;
@@ -58,7 +55,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class Mandel extends ActionBarActivity implements OnTouchListener,
-OnSeekBarChangeListener, OnLayoutChangeListener, OnCheckedChangeListener,
+OnSeekBarChangeListener, OnSurfaceChangedListener, OnCheckedChangeListener,
 CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	private static String TAG = "MANDEL";
@@ -69,6 +66,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private RenderPass clearPass;
 	private RenderPass mandelPass;
 	private Material mandelMaterial;
+	private Material markMaterial;
 	private RenderMode renderMode = RenderMode.SINGLE;
 	private boolean renderMosaic = false;
 	private int colorShader;
@@ -107,6 +105,10 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	private Uniform maxInterationsUniform;
 	private Uniform splitterFloatUniform;
+	
+	private Uniform gradUniform;
+	private Uniform col1Uniform;
+	private Uniform col2Uniform;
 		
 	private ScaleGestureDetector scaleDetector;
 	private GestureDetector gestureDetector;
@@ -116,8 +118,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	private RenderPass mandelFbo2toFboPass;
 	
-	private AlertDialog.Builder maxIterDialog;
-	private AlertDialog.Builder splitFloatDialog;
+	//private AlertDialog.Builder maxIterDialog;
+	//private AlertDialog.Builder splitFloatDialog;
 	
 	private Toast outOfMemToast;
 	private Toast otherGlErrorToast;
@@ -163,7 +165,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		loadShaders(colorShader);
 		mandelMaterial = new Material(mandelShaderProg);
 		
-		maxInterationsUniform = new Uniform("MAX_ITER", 40f);
+		maxInterationsUniform = new Uniform("MAX_ITER", 200f);
 		mandelMaterial.addUniform(maxInterationsUniform);
 		
 		offsetMandelUniform = new Uniform("offset", (float)offsetMandelX, (float)offsetMandelY);
@@ -174,6 +176,17 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		mandelMaterial.addUniform(scaleMandelUniform);
 		splitterFloatUniform = new Uniform("split", 1025f);
 		mandelMaterial.addUniform(splitterFloatUniform);
+		gradUniform = new Uniform("grad", 1f);
+		mandelMaterial.addUniform(gradUniform);
+		Vector3f colVec1 = new Vector3f(0x83, 0x69, 0x53);
+		colVec1.normalizeThis();
+		col1Uniform = new Uniform("col1", colVec1.x, colVec1.y, colVec1.z);
+		mandelMaterial.addUniform(col1Uniform);
+		Vector3f colVec2 = new Vector3f(0x53, 0x6d, 0x83);
+		colVec2.normalizeThis();
+		col2Uniform = new Uniform("col2", colVec2.x, colVec2.y, colVec2.z);
+		mandelMaterial.addUniform(col2Uniform);
+		
 		
 		mandelVertexPass = new SceneRenderPass(new Node(),
 				/*Ignored dummy camera*/ new CameraNode(asp, asp, asp, asp)/*,
@@ -202,15 +215,18 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		view = new Alw3dView(this, model);
 		setContentView(R.layout.activity_mandel);
 				
-		view.addOnLayoutChangeListener(this);
+		view.setOnSurfaceChangedListener(this);
 		FrameLayout frameLayout = (FrameLayout)findViewById(R.id.FrameLayout1);
 		frameLayout.addView(view, 0);
 		view.setOnTouchListener(this);
 		
 		SeekBar iterSeekBar = (SeekBar)findViewById(R.id.iterSeekBar);
 		iterSeekBar.setMax(1024);
-		iterSeekBar.setProgress(40);
+		iterSeekBar.setProgress(200);
 		iterSeekBar.setOnSeekBarChangeListener(this);
+		
+		SeekBar gradBar = (SeekBar)findViewById(R.id.gradBar);
+		gradBar.setOnSeekBarChangeListener(this);
 				
 		View tempView = findViewById(R.id.linearLayout);
 		RadioGroup renderModeRadioGroup = (RadioGroup)tempView.findViewById(R.id.renderModeRadioGroup);
@@ -228,6 +244,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		    
 		    splitterFloatUniform.set(savedInstanceState.getFloat(SPLITTER));
 		    maxInterationsUniform.set(savedInstanceState.getFloat(MAX_ITER));
+		    
+		    gradUniform.set(savedInstanceState.getFloat("grad"));
 		    
 		    renderMode = (RenderMode) savedInstanceState.getSerializable(RENDER_MODE);
 		    colorShader = savedInstanceState.getInt(COLOR_MODE);
@@ -257,13 +275,18 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		findViewById(R.id.linearLayout).findViewById(
 				R.id.colorRadioGroup).setVisibility(
 						View.GONE);
+		findViewById(R.id.linearLayout).findViewById(
+				R.id.gradSettings).setVisibility(
+						View.GONE);
 		
 		posTextView = (TextView) findViewById(R.id.posTextView);
 		setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
 		
-		setAutoMode();
-		
 		loadShaders(colorShader);
+		
+		markMaterial = new Material(ShaderLoader.loadShaderProgram(
+				R.raw.simple_v, R.raw.white_f));
+		
 		setRenderMode(renderMode);
 	}
 	
@@ -319,6 +342,10 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		savedInstanceState.putFloat(SPLITTER, splitterFloatUniform.getFloats()[0]);
 		savedInstanceState.putFloat(MAX_ITER, maxInterationsUniform.getFloats()[0]);
 		
+		savedInstanceState.putFloat("grad", gradUniform.getFloats()[0]);
+		savedInstanceState.putFloat("col1", col1Uniform.getFloats()[0]);
+		savedInstanceState.putFloat("col2", col2Uniform.getFloats()[0]);
+		
 		savedInstanceState.putSerializable(RENDER_MODE, renderMode);
 		savedInstanceState.putInt(COLOR_MODE, colorShader);
 		savedInstanceState.putBoolean(RENDER_MOSAIC, renderMosaic);
@@ -342,7 +369,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		return true;
 	}
 
-	@Override
+	/*@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
 		// Handle action bar item clicks here. The action bar will
 		// automatically handle clicks on the Home/Up button, so long
@@ -400,7 +427,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			splitFloatDialog.show();
 		}
 		return super.onOptionsItemSelected(item);
-	}
+	}*/
 
 	@Override
 	public boolean onTouch(View v, MotionEvent event) {
@@ -512,15 +539,25 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	@Override
 	public void onProgressChanged(SeekBar arg0, int arg1, boolean arg2) {
-		TextView iterText = (TextView)findViewById(R.id.iterTextView);
-		iterText.setText("Iterations: " + arg0.getProgress());
-		
-		// If in a simple mode change the fractal live
-		/*if(renderMode == RenderMode.SINGLE ||
-				renderMode == RenderMode.SINGLE_IN_VERTEX) {
-			maxInterationsUniform.set(arg0.getProgress());
-			mandelPass.setSilent(false);
-		}*/
+		switch(arg0.getId()){
+		case R.id.iterSeekBar:
+			TextView iterText = (TextView)findViewById(R.id.iterTextView);
+			iterText.setText("Iterations: " + arg0.getProgress());
+			
+			// If in a simple mode change the fractal live
+			/*if(renderMode == RenderMode.SINGLE ||
+					renderMode == RenderMode.SINGLE_IN_VERTEX) {
+				maxInterationsUniform.set(arg0.getProgress());
+				mandelPass.setSilent(false);
+			}*/
+			break;
+		case R.id.gradBar:
+			TextView gradText = (TextView)findViewById(R.id.gradText);
+			gradText.setText("Gradient: " + gradFunc(arg0.getProgress()));
+			break;
+		default:
+			break;
+		}
 	}
 
 	@Override
@@ -536,6 +573,19 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			resetVertexMosaic();
 			mandelPass.setSilent(false);
 		}
+		else if(arg0.getId() == R.id.gradBar) {
+			gradUniform.set(gradFunc(arg0.getProgress()));
+			resetVertexMosaic();
+			mandelPass.setSilent(false);
+		}
+	}
+
+	private float gradFunc(float g) {
+		return 0.1f  +  g/50f;
+	}
+	
+	private int gradFuncInv(float x) {
+		return (int) ((x-0.1f)*50f);
 	}
 
 	@Override
@@ -583,6 +633,9 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			case R.id.pastelhsvRadio:
 				colorShader = R.raw.pastelhsvcolor;
 				break;
+			case R.id.gradientRadio:
+				colorShader = R.raw.gradientcolor;
+				break;
 			default:
 				colorShader = R.raw.pastelhsvcolor;
 				break;
@@ -622,6 +675,16 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		group.setVisibility(vis);
 	}
 	
+	public void toggleGradSettings(View view) {
+		View group = findViewById(R.id.gradSettings);
+		int vis = group.getVisibility();
+		if(vis == View.VISIBLE)
+			vis = View.GONE;
+		else
+			vis = View.VISIBLE;
+		group.setVisibility(vis);
+	}
+	
 	public void resetPos(View view) {
 		offsetMandelX = -0.75f/2;
 		offsetMandelY = 0;
@@ -631,18 +694,24 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		setScaleMandelUniform(scale);
 		renderMode = RenderMode.SINGLE;
 		setRenderMode(renderMode);
-		maxInterationsUniform.set(40);
+		maxInterationsUniform.set(200);
 		((SeekBar)findViewById(R.id.iterSeekBar)).setProgress(
 				(int) maxInterationsUniform.getFloats()[0]);
 		
 		findViewById(R.id.renderModeRadioGroup).setVisibility(View.GONE);
 		((RadioButton)findViewById(R.id.radioA)).setChecked(true);
 		setAutoMode();
-		((CheckBox)findViewById(R.id.checkBox1)).setChecked(false);
+		((CheckBox)findViewById(R.id.mosaicBox)).setChecked(false);
 		renderMosaic = false;
+		findViewById(R.id.progressBar).setVisibility(View.GONE);
 		findViewById(R.id.colorRadioGroup).setVisibility(View.GONE);
 		((RadioButton)findViewById(R.id.pastelhsvRadio)).setChecked(true);
 		colorShader = R.id.pastelhsvRadio;
+		
+		gradUniform.set(1f);
+		((SeekBar)findViewById(R.id.gradBar)).setProgress(
+				(int) gradFuncInv(gradUniform.getFloats()[0]));
+		
 		setRenderPasses();
 		setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
 		resetVertexMosaic();
@@ -651,6 +720,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	public void setRenderMosaic(View view) {
 		renderMosaic = ((CheckBox)view).isChecked();
+		if(!renderMosaic) findViewById(R.id.progressBar).setVisibility(View.GONE);
 		setRenderPasses();
 	}
 	
@@ -715,7 +785,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		public boolean onDoubleTap(MotionEvent e) {
 			
 			// Only do this if render mosaic is used
-			if(renderMosaic && (renderMode == RenderMode.SINGLE_IN_VERTEX || renderMode == RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX)) {
+			if(renderMosaic && (renderMode == RenderMode.SINGLE_IN_VERTEX
+					|| renderMode == RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX)) {
 				float oldOffsetFinalX = offsetFinalX;
 				float oldOffsetFinalY = offsetFinalY;
 				float oldScaleFinalX = scaleFinalX;
@@ -758,6 +829,11 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	}
 
 	private void setAutoMode() {
+		
+		CheckBox renderBox = (CheckBox)findViewById(R.id.mosaicBox);
+		if( renderBox.isChecked() != renderMosaic )
+			renderBox.setChecked(renderMosaic);
+
 		RadioButton radio = (RadioButton)findViewById(R.id.radioA);
 		if(radio.isChecked()) {
 			double scale = 1d;
@@ -767,27 +843,36 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			double singleLimit = 0.2d;
 			double vertexSingleLimit = 0.00003d;
 			
-			if(scale < vertexSingleLimit) {
+			// Use this to account for bigger resolutions
+			int w = view.getWidth();
+			if(w == 0) return;
+			int W = 800;
+			
+			if(scale*w/W < vertexSingleLimit) {
 				// We need double precision
 				if(renderMode != RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX) {
 					Toast.makeText(this, "Auto-switching to emulated double precision in vertex shader",
 							Toast.LENGTH_SHORT).show();
 					renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
-					if(maxInterationsUniform.getFloats()[0] <= 40)
+					if(maxInterationsUniform.getFloats()[0] <= 200) {
 						renderMosaic = false;
+						renderBox.setChecked(false);
+					}
 					fullRedraw();
 				}
 				radio.setText("Auto (Emu Double in Vert)");
 			}
 			
-			else if(scale < singleLimit) {
+			else if(scale*w/W < singleLimit) {
 				// We need vertex shader precision
 				if(renderMode != RenderMode.SINGLE_IN_VERTEX) {
 					Toast.makeText(this, "Auto-switching to vertex shader",
 							Toast.LENGTH_SHORT).show();
 					renderMode = RenderMode.SINGLE_IN_VERTEX;
-					if(maxInterationsUniform.getFloats()[0] <= 100)
+					if(maxInterationsUniform.getFloats()[0] <= 100) {
 						renderMosaic = false;
+						renderBox.setChecked(false);
+					}
 					fullRedraw();
 				}
 				radio.setText("Auto (In Vertex)");
@@ -800,6 +885,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 							Toast.LENGTH_SHORT).show();
 					renderMode = RenderMode.SINGLE;
 					renderMosaic = false;
+					renderBox.setChecked(false);
 					fullRedraw();
 				}
 				radio.setText("Auto (Single)");
@@ -808,9 +894,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	}
 
 	@Override
-	public void onLayoutChange(View v, int left, int top, int right,
-			int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
-		if(view.getHeight() == 0 || view.getWidth() == 0) return;
+	public void onSurfaceChanged(int w, int h) {
+		if(w == 0 || h == 0) return;
 		
 		// This will be done first after the view receives it's size in the layout.
 		
@@ -828,13 +913,13 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				view.getHeight(), Texture.TexelType.UBYTE, Texture.Format.GL_RGB, Texture.Filter.NEAREST,
 				Texture.WrapMode.CLAMP_TO_EDGE);
 		// TODO: Are we leaking video memory here when we loose the old FBO?
-		mandelFBO = new FBO(mandelTexture, view.getWidth(), view.getHeight());
+		mandelFBO = new FBO(mandelTexture, w, h);
 		
 		// This pass can copy mandelFBO2 back to mandelFBO
 		Texture mandelTexture2 = new Texture(null, Texture.TextureType.TEXTURE_2D, view.getWidth(),
 				view.getHeight(), Texture.TexelType.UBYTE, Texture.Format.GL_RGB, Texture.Filter.NEAREST,
 				Texture.WrapMode.CLAMP_TO_EDGE);
-		mandelFBO2 = new FBO(mandelTexture2, view.getWidth(), view.getHeight());
+		mandelFBO2 = new FBO(mandelTexture2, w, h);
 		Material directMaterial = new Material(ShaderLoader.loadShaderProgram(R.raw.direct_v, R.raw.direct_f));
 		directMaterial.addTexture("tex", mandelTexture2);
 		mandelFbo2toFboPass = new QuadRenderPass(directMaterial, mandelFBO);
@@ -845,8 +930,6 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		mandelVertexPass.setOneTime(true);
 		
 		final int maxShort = 256*256-1;
-		int w = view.getWidth();
-		int h = view.getHeight();
 		int fullH = h;
 		
 		// Limit the indices to the size of short
@@ -895,6 +978,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		view.requestPreload(finalMaterial);
 		Log.i(TAG, "Loading finished.");
 		
+		setAutoMode();
+		
 		setRenderPasses();
 	}
 	
@@ -930,12 +1015,14 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	private void resetVertexMosaic() {
 		if(mandelVertexMosaicPass != null) {
-			Node rootNode = mandelVertexMosaicPass.getRootNode();
+			tileCount = -1;
+			
+			/*Node rootNode = mandelVertexMosaicPass.getRootNode();
 			if(rootNode != null) {
 				Set<Node> children = rootNode.getChildren();
 				if(!children.isEmpty() && children.toArray()[0] instanceof GeometryNode)
 					((GeometryNode)children.toArray()[0]).setVisible(true);
-			}
+			}*/
 		}
 	}
 
@@ -1047,21 +1134,61 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		posTextView.setText("Position: " + 2*x + " + " + 
 				2*y + "i\nScale: " + scaleString/* + "x"*/);
 	}
-
+	
+	private int tileCount = -1;
+	
 	@Override
 	public void onRenderPassFinished(RenderPass pass) {
 		if(pass == mandelVertexMosaicPass) {
-			Set<Node> parts = ((SceneRenderPass)pass).getRootNode().getChildren();
+			Object[] parts =
+					((SceneRenderPass)pass).getRootNode().getChildren().toArray();
+			
+			if(tileCount >= parts.length) {
+				tileCount = -1;
+				resetVertexMosaic();
+				doneToast.show();
+				return;
+			}
+			
+			for(int i = 0; i < tileCount; i++) {
+				((GeometryNode)parts[i]).setVisible(false);
+			}
+			
+			if(tileCount >= 0) {
+				((GeometryNode)parts[tileCount]).setVisible(true);
+				((GeometryNode)parts[tileCount]).setMaterial(mandelMaterial);
+			}
+			
+			if(tileCount+1 < parts.length) {
+				((GeometryNode)parts[tileCount+1]).setVisible(true);
+				((GeometryNode)parts[tileCount+1]).setMaterial(markMaterial);
+			}
+			
+			for(int i = tileCount + 2; i < parts.length; i++)
+				((GeometryNode)parts[i]).setVisible(false);
+			
+			tileCount++;
+			pass.setSilent(false);
+			
+			//for(int i = 0)
+			
+			/*Set<Node> parts = ((SceneRenderPass)pass).getRootNode().getChildren();
 			
 			Iterator<Node> it = parts.iterator();
 			
 			// TODO: If unexpected nodes are added result is undefined
+			
+			int tiles = parts.size();
+			if(tiles == 0) return;
+			
+			int tileCount = 0;
 			
 			// Find the first visible GeometryNode
 			while(it.hasNext()) {
 				Node node = it.next();
 				if(node instanceof GeometryNode) {
 					GeometryNode gNode = (GeometryNode) node;
+					tileCount++;
 					if(gNode.isVisible()) {
 						gNode.setVisible(false);
 						break;
@@ -1069,12 +1196,23 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				}
 			}
 			
+			/*ProgressBar bar = (ProgressBar) findViewById(R.id.progressBar);
+			if(tileCount < tiles) {
+				bar.setVisibility(View.VISIBLE);
+				bar.setMax(tiles);
+				bar.setProgress(tileCount-1);
+			}
+			else {
+				bar.setProgress(0);
+				bar.setVisibility(View.VISIBLE);
+			}*/
+			
 			// If that was the last Node we are finished
-			if(!it.hasNext()) {
+			/*if(!it.hasNext()) {
 				// Set a GeometryNode to visible to have somewhere to start next time
 				resetVertexMosaic();
 				doneToast.show();
-				return;
+				return; // The pass stays silent
 			}
 			
 			// Otherwise set the next GeometryNode to visible
@@ -1091,7 +1229,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			
 			// Since there were more GeometryNodes let's redraw
 			pass.setSilent(false);
-			
+			*/
 		}
 	}
 	
