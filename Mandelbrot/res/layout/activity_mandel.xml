@@ -125,6 +125,15 @@
                         android:background="@color/settingsBackground"
                         android:orientation="vertical" >
 
+                    </LinearLayout>
+
+                    <RadioGroup
+                        android:id="@+id/colorRadioGroup"
+                        android:layout_width="fill_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1.91"
+                        android:background="@color/settingsBackground" >
+
                         <TextView
                             android:id="@+id/gradText"
                             android:layout_width="wrap_content"
@@ -141,15 +150,6 @@
                             android:layout_weight="1"
                             android:max="200"
                             android:progress="50" />
-
-                    </LinearLayout>
-
-                    <RadioGroup
-                        android:id="@+id/colorRadioGroup"
-                        android:layout_width="fill_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1.91"
-                        android:background="@color/settingsBackground" >
 
                         <TextView
                             android:id="@+id/textView1"
@@ -183,8 +183,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Blue-yellow" />
-
                     </RadioGroup>
+
                 </LinearLayout>
 
             </ScrollView>
@@ -219,14 +219,6 @@
                             android:layout_height="wrap_content"
                             android:onClick="toggleColorSettings"
                             android:text="Colors" />
-
-                        <Button
-                            android:id="@+id/button6"
-                            style="?android:attr/buttonStyleSmall"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:onClick="toggleGradSettings"
-                            android:text="Grad" />
 
                         <Button
                             android:id="@+id/button2"
