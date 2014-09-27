@@ -706,7 +706,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		findViewById(R.id.progressBar).setVisibility(View.GONE);
 		findViewById(R.id.colorRadioGroup).setVisibility(View.GONE);
 		((RadioButton)findViewById(R.id.pastelhsvRadio)).setChecked(true);
-		colorShader = R.id.pastelhsvRadio;
+		colorShader = R.raw.pastelhsvcolor;
 		
 		gradUniform.set(1f);
 		((SeekBar)findViewById(R.id.gradBar)).setProgress(
