@@ -1,0 +1,16 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/ScrollView1"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:visibility="visible"
+    tools:context="tk.betelge.mandelbrot.Mandel" >
+
+    <TextView
+        android:id="@+id/textView1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="\nGPU Mandelbrot\n\n\nUse Two fingers or double tap to zoom.\nWhen all fingers leave the screen the fractal will be redrawn.\nExplore the many options.\n\nAll the calculations are performed on the GPU and the user interface might sometimes pause while OpenGL commands are being processed. Turning on render mosaic might help.\n"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+</ScrollView>
