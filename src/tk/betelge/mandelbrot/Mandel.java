@@ -31,6 +31,8 @@ import tk.betelge.alw3d.renderer.passes.RenderPass;
 import tk.betelge.alw3d.renderer.passes.SceneRenderPass;
 import tk.betelge.alw3d.renderer.passes.RenderPass.OnRenderPassFinishedListener;
 import android.annotation.SuppressLint;
+import android.app.ActionBar.LayoutParams;
+import android.app.Dialog;
 import android.graphics.Bitmap;
 import android.opengl.GLES20;
 import android.opengl.GLException;
@@ -102,6 +104,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private float offsetFinalX = 0f, offsetFinalY = 0f;
 	private Uniform scaleFinalUniform;
 	private Uniform offsetFinalUniform;
+	private ShaderProgram directShaderProg;
 	
 	private Uniform maxInterationsUniform;
 	private Uniform splitterFloatUniform;
@@ -920,7 +923,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				view.getHeight(), Texture.TexelType.UBYTE, Texture.Format.GL_RGB, Texture.Filter.NEAREST,
 				Texture.WrapMode.CLAMP_TO_EDGE);
 		mandelFBO2 = new FBO(mandelTexture2, w, h);
-		Material directMaterial = new Material(ShaderLoader.loadShaderProgram(R.raw.direct_v, R.raw.direct_f));
+		directShaderProg = ShaderLoader.loadShaderProgram(R.raw.direct_v, R.raw.direct_f);
+		Material directMaterial = new Material(directShaderProg);
 		directMaterial.addTexture("tex", mandelTexture2);
 		mandelFbo2toFboPass = new QuadRenderPass(directMaterial, mandelFBO);
 		
@@ -976,6 +980,9 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		view.requestPreload(mandelInVertexShader);
 		view.requestPreload(mandel64InVertexShader);
 		view.requestPreload(finalMaterial);
+		view.requestPreload(directShaderProg);
+		view.requestPreload(mandelFBO);
+		view.requestPreload(mandelFBO2);
 		Log.i(TAG, "Loading finished.");
 		
 		setAutoMode();
@@ -1275,6 +1282,13 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 
 		    return Bitmap.createBitmap(bitmapSource, w, h, Bitmap.Config.ARGB_8888);
 		}
+	}
+	
+	public void showHelp(View view) {
+		Dialog helpDia = new Dialog(this);
+		helpDia.setTitle("GPU Mandelbrot v1.00");
+		helpDia.setContentView(R.layout.help_dialog);
+		helpDia.show();
 	}
 }
 

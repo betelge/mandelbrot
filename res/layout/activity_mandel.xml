@@ -205,7 +205,7 @@
                         android:orientation="vertical" >
 
                         <Button
-                            android:id="@+id/button1"
+                            android:id="@+id/button"
                             style="?android:attr/buttonStyleSmall"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -246,6 +246,14 @@
                     </LinearLayout>
 
                 </ScrollView>
+
+                <Button
+                    android:id="@+id/button6"
+                    style="?android:attr/buttonStyleSmall"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="showHelp"
+                    android:text="Help" />
 
             </LinearLayout>
 
