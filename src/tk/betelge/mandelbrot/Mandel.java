@@ -31,7 +31,6 @@ import tk.betelge.alw3d.renderer.passes.RenderPass;
 import tk.betelge.alw3d.renderer.passes.SceneRenderPass;
 import tk.betelge.alw3d.renderer.passes.RenderPass.OnRenderPassFinishedListener;
 import android.annotation.SuppressLint;
-import android.app.ActionBar.LayoutParams;
 import android.app.Dialog;
 import android.graphics.Bitmap;
 import android.opengl.GLES20;
