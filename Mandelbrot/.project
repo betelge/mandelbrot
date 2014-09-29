@@ -31,11 +31,4 @@
 		<nature>com.android.ide.eclipse.adt.AndroidNature</nature>
 		<nature>org.eclipse.jdt.core.javanature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>ic_launcher-web.png</name>
-			<type>1</type>
-			<location>/home/betelgeuze/Documents/mandelbrot-icon.png</location>
-		</link>
-	</linkedResources>
 </projectDescription>
