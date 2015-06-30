@@ -1,4 +1,4 @@
-precision mediump float;
+precision highp float;
 
 uniform float MAX_ITER;
 uniform vec2 scale;
