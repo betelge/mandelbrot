@@ -32,6 +32,12 @@ import tk.betelge.alw3d.renderer.passes.SceneRenderPass;
 import tk.betelge.alw3d.renderer.passes.RenderPass.OnRenderPassFinishedListener;
 import android.annotation.SuppressLint;
 import android.app.Dialog;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnMultiChoiceClickListener;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.graphics.Bitmap;
 import android.opengl.GLES20;
 import android.opengl.GLException;
@@ -132,6 +138,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	private Bitmap screenshotBitmap;
 	
+	final private int[] allowDouble = {-1};
+	
 	static public enum RenderMode {
 		SINGLE(0x001),
 		EMULATED_DOUBLE(0x002),
@@ -149,6 +157,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			return value;
 		}
 	}
+	
+	private boolean useFallbackInsteadOfDynLoop = false;
 
 	@SuppressLint("ShowToast")
 	@Override
@@ -432,470 +442,6 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	}*/
 
 	@Override
-	public boolean onTouch(View v, MotionEvent event) {
-		if( v == view) {
-			scaleDetector.onTouchEvent(event);
-			gestureDetector.onTouchEvent(event);
-			
-			if(event.getActionMasked() == MotionEvent.ACTION_UP)
-				if(event.getPointerCount() == 1) {
-					// Probably last touch, so redraw the set
-					
-					drawFinalToFboOnce();
-					
-					synchronized (model.getRenderPasses()) {
-						
-						// Put all the transforms in the mandel redraw
-						offsetMandelX += offsetFinalX*scaleFinalX*scaleMandelX;
-						offsetMandelY += offsetFinalY*scaleFinalY*scaleMandelY;
-						scaleMandelX *= scaleFinalX;
-						scaleMandelY *= scaleFinalY;
-						
-						// and reset the final transform
-						scaleFinalX = 1f;
-						scaleFinalY = 1f;
-						offsetFinalX = 0f;
-						offsetFinalY = 0f;
-						
-						scaleMandelUniform.set(scaleMandelX, scaleMandelY);
-						setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
-						
-						scaleFinalUniform.set(scaleFinalX, scaleFinalY);
-						offsetFinalUniform.set(offsetFinalX, offsetFinalY);
-						
-						// Reactivate final drawing and run the mandel pass once
-						resetVertexMosaic();
-						setAutoMode();
-						mandelPass.setSilent(false);
-					}
-					
-					setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
-				}
-			
-			return true;
-		}
-		
-		return false;
-	}
-	
-	private void drawFinalToFboOnce() {
-		// TODO: Many race conditions here that could lock the code
-		
-		// Draw the scaled final image into the fbo once
-		FBO clearFBO = clearPass.getFbo();
-		FBO finalFBO = finalPass.getFbo();
-		SetListener waitForIt = new SetListener(null);
-		synchronized (model.getRenderPasses()) {
-			finalPass.setOnRenderPassFinishedListener(new SetListener(finalFBO, waitForIt));
-		}
-		while(finalPass.getOnRenderPassFinishedListener() != waitForIt) Thread.yield();
-		finalPass.setOnRenderPassFinishedListener(null);
-		synchronized (model.getRenderPasses()) {
-			clearFBO = clearPass.getFbo();
-			finalFBO = finalPass.getFbo();
-			
-			clearPass.setFbo(mandelFBO2);
-			finalPass.setFbo(mandelFBO2);
-			clearPass.setOnRenderPassFinishedListener(new SetListener(clearFBO));
-			finalPass.setOnRenderPassFinishedListener(new SetListener(finalFBO, waitForIt));
-		}
-		while(finalPass.getOnRenderPassFinishedListener() != waitForIt) Thread.yield();
-		finalPass.setOnRenderPassFinishedListener(null);
-		synchronized (model.getRenderPasses()) {
-			List<RenderPass> renderPasses = model.getRenderPasses();
-			renderPasses.clear();
-			mandelFbo2toFboPass.setFbo(mandelFBO);
-			mandelFbo2toFboPass.setOnRenderPassFinishedListener(new SetListener(mandelFBO2));
-			// This was probably causing the occasional black fill bug
-			//renderPasses.add(new ClearPass(GLES20.GL_COLOR_BUFFER_BIT, mandelFBO));
-			renderPasses.add(mandelFbo2toFboPass);
-		}
-		while(mandelFbo2toFboPass.getFbo() != mandelFBO2) Thread.yield();
-		setRenderPasses();
-	}
-	
-	private class SetListener implements OnRenderPassFinishedListener {
-		private FBO fbo;
-		private SetListener listener;
-		
-		public SetListener(FBO fbo) {
-			this(fbo, null);
-		}
-		
-		public SetListener(FBO fbo, SetListener listener) {
-			this.fbo = fbo;
-			if(listener != this)
-				this.listener = listener;
-			else
-				this.listener = null;
-		}
-		
-		@Override
-		public void onRenderPassFinished(
-				RenderPass pass) {
-			pass.setFbo(fbo);
-			if(listener != null)
-				pass.setOnRenderPassFinishedListener(listener);
-		}
-	}
-	
-	@Override
-	public void onProgressChanged(SeekBar arg0, int arg1, boolean arg2) {
-		switch(arg0.getId()){
-		case R.id.iterSeekBar:
-			TextView iterText = (TextView)findViewById(R.id.iterTextView);
-			iterText.setText("Iterations: " + arg0.getProgress());
-			
-			// If in a simple mode change the fractal live
-			/*if(renderMode == RenderMode.SINGLE ||
-					renderMode == RenderMode.SINGLE_IN_VERTEX) {
-				maxInterationsUniform.set(arg0.getProgress());
-				mandelPass.setSilent(false);
-			}*/
-			break;
-		case R.id.gradBar:
-			TextView gradText = (TextView)findViewById(R.id.gradText);
-			gradText.setText("Gradient: " + gradFunc(arg0.getProgress()));
-			break;
-		default:
-			break;
-		}
-	}
-
-	@Override
-	public void onStartTrackingTouch(SeekBar arg0) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void onStopTrackingTouch(SeekBar arg0) {
-		if(arg0.getId() == R.id.iterSeekBar) {
-			maxInterationsUniform.set(arg0.getProgress());
-			resetVertexMosaic();
-			mandelPass.setSilent(false);
-		}
-		else if(arg0.getId() == R.id.gradBar) {
-			gradUniform.set(gradFunc(arg0.getProgress()));
-			resetVertexMosaic();
-			mandelPass.setSilent(false);
-		}
-	}
-
-	private float gradFunc(float g) {
-		return 0.1f  +  g/50f;
-	}
-	
-	private int gradFuncInv(float x) {
-		return (int) ((x-0.1f)*50f);
-	}
-
-	@Override
-	public void onCheckedChanged(RadioGroup arg0, int arg1) {
-		if(arg0.getId() == R.id.renderModeRadioGroup) {
-			
-			if(arg0.getCheckedRadioButtonId() != R.id.radioA)
-				((RadioButton)findViewById(R.id.radioA)).setText("Auto");
-		
-			switch(arg0.getCheckedRadioButtonId()) {
-			case R.id.radioA:
-				setAutoMode();
-				break;
-			case R.id.radioS:
-				renderMode = RenderMode.SINGLE;
-				break;
-			case R.id.radioED:
-				renderMode = RenderMode.EMULATED_DOUBLE;
-				break;
-			case R.id.radioExpED:
-				renderMode = RenderMode.EXP_EMULATED_DOUBLE;
-		        break;
-			case R.id.radioSV:
-				renderMode = RenderMode.SINGLE_IN_VERTEX;
-				break;
-			case R.id.radioEDV:
-				renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
-				break;
-			default:
-				renderMode = RenderMode.SINGLE;
-				break;
-			}
-			
-			fullRedraw();
-			
-		} else if(arg0.getId() == R.id.colorRadioGroup) {
-			
-			switch(arg0.getCheckedRadioButtonId()) {
-			case R.id.huecircleRadio:
-				colorShader = R.raw.hsvcolor;
-				break;
-			case R.id.blueyellowRadio:
-				colorShader = R.raw.blueyellowcolor;
-				break;
-			case R.id.pastelhsvRadio:
-				colorShader = R.raw.pastelhsvcolor;
-				break;
-			case R.id.gradientRadio:
-				colorShader = R.raw.gradientcolor;
-				break;
-			default:
-				colorShader = R.raw.pastelhsvcolor;
-				break;
-			}
-			
-			loadShaders(colorShader);
-			fullRedraw();
-		}
-	}
-	
-	private void fullRedraw() {
-		synchronized (model.getRenderPasses()) {
-			resetVertexMosaic();
-			setRenderMode(renderMode);
-			setRenderPasses();
-			mandelPass.setSilent(false);
-		}
-	}
-
-	public void toggleModeSettings(View view) {
-		View group = findViewById(R.id.renderModeRadioGroup);
-		int vis = group.getVisibility();
-		if(vis == View.VISIBLE)
-			vis = View.GONE;
-		else
-			vis = View.VISIBLE;
-		group.setVisibility(vis);
-	}
-	
-	public void toggleColorSettings(View view) {
-		View group = findViewById(R.id.colorRadioGroup);
-		int vis = group.getVisibility();
-		if(vis == View.VISIBLE)
-			vis = View.GONE;
-		else
-			vis = View.VISIBLE;
-		group.setVisibility(vis);
-	}
-	
-	public void toggleGradSettings(View view) {
-		View group = findViewById(R.id.gradSettings);
-		int vis = group.getVisibility();
-		if(vis == View.VISIBLE)
-			vis = View.GONE;
-		else
-			vis = View.VISIBLE;
-		group.setVisibility(vis);
-	}
-	
-	public void resetPos(View view) {
-		offsetMandelX = -0.75f/2;
-		offsetMandelY = 0;
-		scale = 1;
-		
-		setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
-		setScaleMandelUniform(scale);
-		renderMode = RenderMode.SINGLE;
-		setRenderMode(renderMode);
-		maxInterationsUniform.set(200);
-		((SeekBar)findViewById(R.id.iterSeekBar)).setProgress(
-				(int) maxInterationsUniform.getFloats()[0]);
-		
-		findViewById(R.id.renderModeRadioGroup).setVisibility(View.GONE);
-		((RadioButton)findViewById(R.id.radioA)).setChecked(true);
-		setAutoMode();
-		((CheckBox)findViewById(R.id.mosaicBox)).setChecked(false);
-		renderMosaic = false;
-		findViewById(R.id.progressBar).setVisibility(View.GONE);
-		findViewById(R.id.colorRadioGroup).setVisibility(View.GONE);
-		((RadioButton)findViewById(R.id.pastelhsvRadio)).setChecked(true);
-		colorShader = R.raw.pastelhsvcolor;
-		
-		gradUniform.set(1f);
-		((SeekBar)findViewById(R.id.gradBar)).setProgress(
-				(int) gradFuncInv(gradUniform.getFloats()[0]));
-		
-		setRenderPasses();
-		setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
-		resetVertexMosaic();
-		mandelPass.setSilent(false);
-	}
-	
-	public void setRenderMosaic(View view) {
-		renderMosaic = ((CheckBox)view).isChecked();
-		if(!renderMosaic) findViewById(R.id.progressBar).setVisibility(View.GONE);
-		setRenderPasses();
-	}
-	
-	public void showHUD(View view) {
-		findViewById(R.id.showButton).setVisibility(View.GONE);
-		findViewById(R.id.HUD).setVisibility(View.VISIBLE);
-	}
-	
-	public void hideHUD(View view) {
-		findViewById(R.id.HUD).setVisibility(View.GONE);
-		findViewById(R.id.showButton).setVisibility(View.VISIBLE);
-	}
-	
-	public void saveImage(View view) {
-		screenshotBitmap = null;
-		synchronized (model.getRenderPasses()) {
-			model.getRenderPasses().add(new ScreenshotPass());
-		}
-		Calendar cal = Calendar.getInstance();
-		long time = cal.getTimeInMillis();
-		
-		while (screenshotBitmap == null && time < cal.getTimeInMillis() + 5000)
-			Thread.yield();
-		
-		if(screenshotBitmap == null)
-			Utils.displayFileError(this);
-		else {
-			Utils.saveBitmapToFile(this, screenshotBitmap);
-			screenshotBitmap.recycle();
-			screenshotBitmap = null;
-		}
-	}
-
-	private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
-		@Override
-		public boolean onScale(ScaleGestureDetector detector) {
-		    float factor = detector.getScaleFactor();
-		    scaleFinalX /= factor;
-		    scaleFinalY /= factor;
-		    scale /= factor;
-		    offsetFinalX *= factor;
-			offsetFinalY *= factor;
-		    scaleFinalUniform.set(scaleFinalX, scaleFinalY);
-		    offsetFinalUniform.set(offsetFinalX, offsetFinalY);
-		
-		    //invalidate();
-		    return true;
-		}
-	}
-	
-	private class GestureListener extends GestureDetector.SimpleOnGestureListener {
-		@Override
-		public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-			offsetFinalX += 2*distanceX/view.getWidth();
-			offsetFinalY -= 2*distanceY/view.getHeight();
-			offsetFinalUniform.set(offsetFinalX, offsetFinalY);
-			
-			return true;
-		}
-		
-		@Override
-		public boolean onDoubleTap(MotionEvent e) {
-			
-			// Only do this if render mosaic is used
-			if(renderMosaic && (renderMode == RenderMode.SINGLE_IN_VERTEX
-					|| renderMode == RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX)) {
-				float oldOffsetFinalX = offsetFinalX;
-				float oldOffsetFinalY = offsetFinalY;
-				float oldScaleFinalX = scaleFinalX;
-				float oldScaleFinalY = scaleFinalY;
-				
-				// Temporarily change final
-				offsetFinalX += 2*scaleFinalX*(e.getX()/view.getWidth()*2 -1);
-				offsetFinalY -= 2*scaleFinalY*(e.getY()/view.getHeight()*2 -1);
-				scaleFinalX /= 2;
-				scaleFinalY /= 2;
-				scaleFinalUniform.set(scaleFinalX, scaleFinalY);
-				offsetFinalUniform.set(offsetFinalX, offsetFinalY);
-				
-				drawFinalToFboOnce();
-				
-				// Reset final
-				offsetFinalX = oldOffsetFinalX;
-				offsetFinalY = oldOffsetFinalY;
-				scaleFinalX = oldScaleFinalX;
-				scaleFinalY = oldScaleFinalY;
-				offsetFinalUniform.set(offsetFinalX, offsetFinalY);
-				scaleFinalUniform.set(scaleFinalX, scaleFinalY);
-			}
-			
-			// Do the changes to mandel instead of final
-			offsetMandelX += scaleMandelX*(e.getX()/view.getWidth()*2 -1);
-			offsetMandelY -= scaleMandelY*(e.getY()/view.getHeight()*2 -1);
-			scaleMandelX /= 2;
-			scaleMandelY /= 2;
-			scale /= 2;
-			scaleMandelUniform.set(scaleMandelX, scaleMandelY);
-						
-			setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
-			
-			setAutoMode();
-			return true;
-		}
-		
-		
-	}
-
-	private void setAutoMode() {
-		
-		CheckBox renderBox = (CheckBox)findViewById(R.id.mosaicBox);
-		if( renderBox.isChecked() != renderMosaic )
-			renderBox.setChecked(renderMosaic);
-
-		RadioButton radio = (RadioButton)findViewById(R.id.radioA);
-		if(radio.isChecked()) {
-			double scale = 1d;
-			if(scaleMandelX < scaleMandelY) scale = scaleMandelX;
-			else scale = scaleMandelY;
-			
-			double singleLimit = 0.2d;
-			double vertexSingleLimit = 0.00003d;
-			
-			// Use this to account for bigger resolutions
-			int w = view.getWidth();
-			if(w == 0) return;
-			int W = 800;
-			
-			if(scale*w/W < vertexSingleLimit) {
-				// We need double precision
-				if(renderMode != RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX) {
-					Toast.makeText(this, "Auto-switching to emulated double precision in vertex shader",
-							Toast.LENGTH_SHORT).show();
-					renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
-					if(maxInterationsUniform.getFloats()[0] <= 200) {
-						renderMosaic = false;
-						renderBox.setChecked(false);
-					}
-					fullRedraw();
-				}
-				radio.setText("Auto (Emu Double in Vert)");
-			}
-			
-			else if(scale*w/W < singleLimit) {
-				// We need vertex shader precision
-				if(renderMode != RenderMode.SINGLE_IN_VERTEX) {
-					Toast.makeText(this, "Auto-switching to vertex shader",
-							Toast.LENGTH_SHORT).show();
-					renderMode = RenderMode.SINGLE_IN_VERTEX;
-					if(maxInterationsUniform.getFloats()[0] <= 100) {
-						renderMosaic = false;
-						renderBox.setChecked(false);
-					}
-					fullRedraw();
-				}
-				radio.setText("Auto (In Vertex)");
-			}
-			
-			else {
-				// Normal fragment shader precision is enough
-				if(renderMode != RenderMode.SINGLE) {
-					Toast.makeText(this, "Auto-switching to fragment shader",
-							Toast.LENGTH_SHORT).show();
-					renderMode = RenderMode.SINGLE;
-					renderMosaic = false;
-					renderBox.setChecked(false);
-					fullRedraw();
-				}
-				radio.setText("Auto (Single)");
-			}
-		}
-	}
-
-	@Override
 	public void onSurfaceChanged(int w, int h) {
 		if(w == 0 || h == 0) return;
 		
@@ -1125,8 +671,16 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 					outOfMemToast.show();
 			}
 		}
-		else
-			otherGlErrorToast.show();
+		else {
+			// Have we tried usign the dyn loop fallback yet?
+			if(!useFallbackInsteadOfDynLoop) {
+				useFallbackInsteadOfDynLoop = true;
+				// Redo everything
+				onSurfaceChanged(view.getWidth(), view.getHeight());
+			}
+			else
+				otherGlErrorToast.show();
+		}
 	}
 	
 	private void setPosInfo(double x, double y, double scaleX, double scaleY) {
@@ -1141,6 +695,549 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				2*y + "i\nScale: " + scaleString/* + "x"*/);
 	}
 	
+	/*@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		// Handle action bar item clicks here. The action bar will
+		// automatically handle clicks on the Home/Up button, so long
+		// as you specify a parent activity in AndroidManifest.xml.
+		int id = item.getItemId();
+		if(id == R.id.showHUD) {
+			if(!item.isChecked()) {
+				findViewById(R.id.HUD).setVisibility(View.VISIBLE);
+				item.setChecked(true);
+			}
+			else {
+				findViewById(R.id.HUD).setVisibility(View.GONE);
+				item.setChecked(false);
+			}
+		}
+		if(id == R.id.chooseMaxIter) {
+			maxIterDialog = new AlertDialog.Builder(this);
+			maxIterDialog.setTitle("Maximum iteration");
+			maxIterDialog.setMessage("Set a value");
+			// Set an EditText view to get user input 
+			final NumberPicker input = new NumberPicker(this);
+			input.setMinValue(0);
+			input.setMaxValue(2<<12);
+			input.setValue((int)maxInterationsUniform.getFloats()[0]);
+			maxIterDialog.setView(input);
+			maxIterDialog.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+				public void onClick(DialogInterface dialog, int whichButton) {
+				  	int value = input.getValue();
+				  	maxInterationsUniform.set((float)value);
+				  	resetVertexMosaic();
+				  	mandelPass.setSilent(false);
+				}
+			});
+			maxIterDialog.show();
+		}
+		if(id == R.id.chooseSplitter) {
+			
+			splitFloatDialog = new AlertDialog.Builder(this);
+			splitFloatDialog.setTitle("Float splitter");
+			splitFloatDialog.setMessage("Set a value");
+			// Set an EditText view to get user input 
+			final NumberPicker input2 = new NumberPicker(this);
+			input2.setMinValue(0);
+			input2.setMaxValue(1<<23 + 1);
+			input2.setValue((int)splitterFloatUniform.getFloats()[0]);
+			splitFloatDialog.setView(input2);
+			splitFloatDialog.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+				public void onClick(DialogInterface dialog, int whichButton) {
+				  	int value = input2.getValue();
+				  	splitterFloatUniform.set((float)value);
+				  	resetVertexMosaic();
+				  	mandelPass.setSilent(false);
+				}
+			});
+			splitFloatDialog.show();
+		}
+		return super.onOptionsItemSelected(item);
+	}*/
+	
+	@Override
+	public boolean onTouch(View v, MotionEvent event) {
+		if( v == view) {
+			scaleDetector.onTouchEvent(event);
+			gestureDetector.onTouchEvent(event);
+			
+			if(event.getActionMasked() == MotionEvent.ACTION_UP)
+				if(event.getPointerCount() == 1) {
+					// Probably last touch, so redraw the set
+					
+					drawFinalToFboOnce();
+					
+					synchronized (model.getRenderPasses()) {
+						
+						// Put all the transforms in the mandel redraw
+						offsetMandelX += offsetFinalX*scaleFinalX*scaleMandelX;
+						offsetMandelY += offsetFinalY*scaleFinalY*scaleMandelY;
+						scaleMandelX *= scaleFinalX;
+						scaleMandelY *= scaleFinalY;
+						
+						// and reset the final transform
+						scaleFinalX = 1f;
+						scaleFinalY = 1f;
+						offsetFinalX = 0f;
+						offsetFinalY = 0f;
+						
+						scaleMandelUniform.set(scaleMandelX, scaleMandelY);
+						setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
+						
+						scaleFinalUniform.set(scaleFinalX, scaleFinalY);
+						offsetFinalUniform.set(offsetFinalX, offsetFinalY);
+						
+						// Reactivate final drawing and run the mandel pass once
+						resetVertexMosaic();
+						setAutoMode();
+						mandelPass.setSilent(false);
+					}
+					
+					setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
+				}
+			
+			return true;
+		}
+		
+		return false;
+	}
+
+	private void drawFinalToFboOnce() {
+		// TODO: Many race conditions here that could lock the code
+		
+		// Draw the scaled final image into the fbo once
+		FBO clearFBO = clearPass.getFbo();
+		FBO finalFBO = finalPass.getFbo();
+		SetListener waitForIt = new SetListener(null);
+		synchronized (model.getRenderPasses()) {
+			finalPass.setOnRenderPassFinishedListener(new SetListener(finalFBO, waitForIt));
+		}
+		while(finalPass.getOnRenderPassFinishedListener() != waitForIt) Thread.yield();
+		finalPass.setOnRenderPassFinishedListener(null);
+		synchronized (model.getRenderPasses()) {
+			clearFBO = clearPass.getFbo();
+			finalFBO = finalPass.getFbo();
+			
+			clearPass.setFbo(mandelFBO2);
+			finalPass.setFbo(mandelFBO2);
+			clearPass.setOnRenderPassFinishedListener(new SetListener(clearFBO));
+			finalPass.setOnRenderPassFinishedListener(new SetListener(finalFBO, waitForIt));
+		}
+		while(finalPass.getOnRenderPassFinishedListener() != waitForIt) Thread.yield();
+		finalPass.setOnRenderPassFinishedListener(null);
+		synchronized (model.getRenderPasses()) {
+			List<RenderPass> renderPasses = model.getRenderPasses();
+			renderPasses.clear();
+			mandelFbo2toFboPass.setFbo(mandelFBO);
+			mandelFbo2toFboPass.setOnRenderPassFinishedListener(new SetListener(mandelFBO2));
+			// This was probably causing the occasional black fill bug
+			//renderPasses.add(new ClearPass(GLES20.GL_COLOR_BUFFER_BIT, mandelFBO));
+			renderPasses.add(mandelFbo2toFboPass);
+		}
+		while(mandelFbo2toFboPass.getFbo() != mandelFBO2) Thread.yield();
+		setRenderPasses();
+	}
+
+	private class SetListener implements OnRenderPassFinishedListener {
+		private FBO fbo;
+		private SetListener listener;
+		
+		public SetListener(FBO fbo) {
+			this(fbo, null);
+		}
+		
+		public SetListener(FBO fbo, SetListener listener) {
+			this.fbo = fbo;
+			if(listener != this)
+				this.listener = listener;
+			else
+				this.listener = null;
+		}
+		
+		@Override
+		public void onRenderPassFinished(
+				RenderPass pass) {
+			pass.setFbo(fbo);
+			if(listener != null)
+				pass.setOnRenderPassFinishedListener(listener);
+		}
+	}
+
+	@Override
+	public void onProgressChanged(SeekBar arg0, int arg1, boolean arg2) {
+		switch(arg0.getId()){
+		case R.id.iterSeekBar:
+			TextView iterText = (TextView)findViewById(R.id.iterTextView);
+			iterText.setText("Iterations: " + arg0.getProgress());
+			
+			// If in a simple mode change the fractal live
+			/*if(renderMode == RenderMode.SINGLE ||
+					renderMode == RenderMode.SINGLE_IN_VERTEX) {
+				maxInterationsUniform.set(arg0.getProgress());
+				mandelPass.setSilent(false);
+			}*/
+			break;
+		case R.id.gradBar:
+			TextView gradText = (TextView)findViewById(R.id.gradText);
+			gradText.setText("Gradient: " + gradFunc(arg0.getProgress()));
+			break;
+		default:
+			break;
+		}
+	}
+
+	@Override
+	public void onStartTrackingTouch(SeekBar arg0) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void onStopTrackingTouch(SeekBar arg0) {
+		if(arg0.getId() == R.id.iterSeekBar) {
+			maxInterationsUniform.set(arg0.getProgress());
+			resetVertexMosaic();
+			mandelPass.setSilent(false);
+		}
+		else if(arg0.getId() == R.id.gradBar) {
+			gradUniform.set(gradFunc(arg0.getProgress()));
+			resetVertexMosaic();
+			mandelPass.setSilent(false);
+		}
+	}
+
+	private float gradFunc(float g) {
+		return 0.1f  +  g/50f;
+	}
+
+	private int gradFuncInv(float x) {
+		return (int) ((x-0.1f)*50f);
+	}
+
+	@Override
+	public void onCheckedChanged(RadioGroup arg0, int arg1) {
+		if(arg0.getId() == R.id.renderModeRadioGroup) {
+			
+			if(arg0.getCheckedRadioButtonId() != R.id.radioA)
+				((RadioButton)findViewById(R.id.radioA)).setText("Auto");
+		
+			switch(arg0.getCheckedRadioButtonId()) {
+			case R.id.radioA:
+				setAutoMode();
+				break;
+			case R.id.radioS:
+				renderMode = RenderMode.SINGLE;
+				break;
+			case R.id.radioED:
+				renderMode = RenderMode.EMULATED_DOUBLE;
+				break;
+			case R.id.radioExpED:
+				renderMode = RenderMode.EXP_EMULATED_DOUBLE;
+		        break;
+			case R.id.radioSV:
+				renderMode = RenderMode.SINGLE_IN_VERTEX;
+				break;
+			case R.id.radioEDV:
+				/*if(allowDouble[0] == -1) {
+					allowDouble[0] = 0;
+					showWarning();
+					break;
+				}*/
+				renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
+				break;
+			default:
+				renderMode = RenderMode.SINGLE;
+				break;
+			}
+			
+			fullRedraw();
+			
+		} else if(arg0.getId() == R.id.colorRadioGroup) {
+			
+			switch(arg0.getCheckedRadioButtonId()) {
+			case R.id.huecircleRadio:
+				colorShader = R.raw.hsvcolor;
+				break;
+			case R.id.blueyellowRadio:
+				colorShader = R.raw.blueyellowcolor;
+				break;
+			case R.id.pastelhsvRadio:
+				colorShader = R.raw.pastelhsvcolor;
+				break;
+			case R.id.gradientRadio:
+				colorShader = R.raw.gradientcolor;
+				break;
+			default:
+				colorShader = R.raw.pastelhsvcolor;
+				break;
+			}
+			
+			loadShaders(colorShader);
+			fullRedraw();
+		}
+	}
+
+	private void fullRedraw() {
+		synchronized (model.getRenderPasses()) {
+			resetVertexMosaic();
+			setRenderMode(renderMode);
+			setRenderPasses();
+			mandelPass.setSilent(false);
+		}
+	}
+
+	public void toggleModeSettings(View view) {
+		View group = findViewById(R.id.renderModeRadioGroup);
+		int vis = group.getVisibility();
+		if(vis == View.VISIBLE)
+			vis = View.GONE;
+		else
+			vis = View.VISIBLE;
+		group.setVisibility(vis);
+	}
+
+	public void toggleColorSettings(View view) {
+		View group = findViewById(R.id.colorRadioGroup);
+		int vis = group.getVisibility();
+		if(vis == View.VISIBLE)
+			vis = View.GONE;
+		else
+			vis = View.VISIBLE;
+		group.setVisibility(vis);
+	}
+
+	public void toggleGradSettings(View view) {
+		View group = findViewById(R.id.gradSettings);
+		int vis = group.getVisibility();
+		if(vis == View.VISIBLE)
+			vis = View.GONE;
+		else
+			vis = View.VISIBLE;
+		group.setVisibility(vis);
+	}
+
+	public void resetPos(View view) {
+		offsetMandelX = -0.75f/2;
+		offsetMandelY = 0;
+		scale = 1;
+		
+		allowDouble[0] = -1; // ask again
+		
+		setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
+		setScaleMandelUniform(scale);
+		renderMode = RenderMode.SINGLE;
+		setRenderMode(renderMode);
+		maxInterationsUniform.set(200);
+		((SeekBar)findViewById(R.id.iterSeekBar)).setProgress(
+				(int) maxInterationsUniform.getFloats()[0]);
+		
+		findViewById(R.id.renderModeRadioGroup).setVisibility(View.GONE);
+		((RadioButton)findViewById(R.id.radioA)).setChecked(true);
+		setAutoMode();
+		((CheckBox)findViewById(R.id.mosaicBox)).setChecked(false);
+		renderMosaic = false;
+		findViewById(R.id.progressBar).setVisibility(View.GONE);
+		findViewById(R.id.colorRadioGroup).setVisibility(View.GONE);
+		((RadioButton)findViewById(R.id.pastelhsvRadio)).setChecked(true);
+		colorShader = R.raw.pastelhsvcolor;
+		
+		gradUniform.set(1f);
+		((SeekBar)findViewById(R.id.gradBar)).setProgress(
+				(int) gradFuncInv(gradUniform.getFloats()[0]));
+		
+		setRenderPasses();
+		setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
+		resetVertexMosaic();
+		mandelPass.setSilent(false);
+	}
+
+	public void setRenderMosaic(View view) {
+		renderMosaic = ((CheckBox)view).isChecked();
+		if(!renderMosaic) findViewById(R.id.progressBar).setVisibility(View.GONE);
+		setRenderPasses();
+	}
+
+	public void showHUD(View view) {
+		findViewById(R.id.showButton).setVisibility(View.GONE);
+		findViewById(R.id.HUD).setVisibility(View.VISIBLE);
+	}
+
+	public void hideHUD(View view) {
+		findViewById(R.id.HUD).setVisibility(View.GONE);
+		findViewById(R.id.showButton).setVisibility(View.VISIBLE);
+	}
+
+	public void saveImage(View view) {
+		screenshotBitmap = null;
+		synchronized (model.getRenderPasses()) {
+			model.getRenderPasses().add(new ScreenshotPass());
+		}
+		Calendar cal = Calendar.getInstance();
+		long time = cal.getTimeInMillis();
+		
+		while (screenshotBitmap == null && time < cal.getTimeInMillis() + 5000)
+			Thread.yield();
+		
+		if(screenshotBitmap == null)
+			Utils.displayFileError(this);
+		else {
+			Utils.saveBitmapToFile(this, screenshotBitmap);
+			screenshotBitmap.recycle();
+			screenshotBitmap = null;
+		}
+	}
+
+	private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
+		@Override
+		public boolean onScale(ScaleGestureDetector detector) {
+		    float factor = detector.getScaleFactor();
+		    scaleFinalX /= factor;
+		    scaleFinalY /= factor;
+		    scale /= factor;
+		    offsetFinalX *= factor;
+			offsetFinalY *= factor;
+		    scaleFinalUniform.set(scaleFinalX, scaleFinalY);
+		    offsetFinalUniform.set(offsetFinalX, offsetFinalY);
+		
+		    //invalidate();
+		    return true;
+		}
+	}
+
+	private class GestureListener extends GestureDetector.SimpleOnGestureListener {
+		@Override
+		public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+			offsetFinalX += 2*distanceX/view.getWidth();
+			offsetFinalY -= 2*distanceY/view.getHeight();
+			offsetFinalUniform.set(offsetFinalX, offsetFinalY);
+			
+			return true;
+		}
+		
+		@Override
+		public boolean onDoubleTap(MotionEvent e) {
+			
+			// Only do this if render mosaic is used
+			if(renderMosaic && (renderMode == RenderMode.SINGLE_IN_VERTEX
+					|| renderMode == RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX)) {
+				float oldOffsetFinalX = offsetFinalX;
+				float oldOffsetFinalY = offsetFinalY;
+				float oldScaleFinalX = scaleFinalX;
+				float oldScaleFinalY = scaleFinalY;
+				
+				// Temporarily change final
+				offsetFinalX += 2*scaleFinalX*(e.getX()/view.getWidth()*2 -1);
+				offsetFinalY -= 2*scaleFinalY*(e.getY()/view.getHeight()*2 -1);
+				scaleFinalX /= 2;
+				scaleFinalY /= 2;
+				scaleFinalUniform.set(scaleFinalX, scaleFinalY);
+				offsetFinalUniform.set(offsetFinalX, offsetFinalY);
+				
+				drawFinalToFboOnce();
+				
+				// Reset final
+				offsetFinalX = oldOffsetFinalX;
+				offsetFinalY = oldOffsetFinalY;
+				scaleFinalX = oldScaleFinalX;
+				scaleFinalY = oldScaleFinalY;
+				offsetFinalUniform.set(offsetFinalX, offsetFinalY);
+				scaleFinalUniform.set(scaleFinalX, scaleFinalY);
+			}
+			
+			// Do the changes to mandel instead of final
+			offsetMandelX += scaleMandelX*(e.getX()/view.getWidth()*2 -1);
+			offsetMandelY -= scaleMandelY*(e.getY()/view.getHeight()*2 -1);
+			scaleMandelX /= 2;
+			scaleMandelY /= 2;
+			scale /= 2;
+			scaleMandelUniform.set(scaleMandelX, scaleMandelY);
+						
+			setPosInfo(offsetMandelX, offsetMandelY, scaleMandelX, scaleMandelY);
+			
+			setAutoMode();
+			return true;
+		}
+		
+		
+	}
+
+	private void setAutoMode() {
+		
+		CheckBox renderBox = (CheckBox)findViewById(R.id.mosaicBox);
+		if( renderBox.isChecked() != renderMosaic )
+			renderBox.setChecked(renderMosaic);
+	
+		RadioButton radio = (RadioButton)findViewById(R.id.radioA);
+		if(radio.isChecked()) {
+			double scale = 1d;
+			if(scaleMandelX < scaleMandelY) scale = scaleMandelX;
+			else scale = scaleMandelY;
+			
+			double singleLimit = 0.2d;
+			double vertexSingleLimit = 0.00003d;
+			
+			// Use this to account for bigger resolutions
+			int w = view.getWidth();
+			if(w == 0) return;
+			int W = 800;
+			
+			// TODO: Doesn't work!! Wrong value from preferences.
+			if(!getSharedPreferences("MANDEL", 0).getBoolean("allowDouble", false));
+				if(scale*w/W < vertexSingleLimit) {
+					if(allowDouble[0] == -1) {
+						allowDouble[0] = 0;
+						showWarning();
+					}
+					else if(allowDouble[0] == 0) {
+						vertexSingleLimit = 0;
+					}
+				}
+			
+			if(scale*w/W < vertexSingleLimit) {
+				// We need double precision
+				if(renderMode != RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX) {
+					Toast.makeText(this, "Auto-switching to emulated double precision in vertex shader",
+							Toast.LENGTH_SHORT).show();
+					renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
+					if(maxInterationsUniform.getFloats()[0] <= 200) {
+						renderMosaic = false;
+						renderBox.setChecked(false);
+					}
+					fullRedraw();
+				}
+				radio.setText("Auto (Emu Double in Vert)");
+			}
+			
+			else if(scale*w/W < singleLimit) {
+				// We need vertex shader precision
+				if(renderMode != RenderMode.SINGLE_IN_VERTEX) {
+					Toast.makeText(this, "Auto-switching to vertex shader",
+							Toast.LENGTH_SHORT).show();
+					renderMode = RenderMode.SINGLE_IN_VERTEX;
+					if(maxInterationsUniform.getFloats()[0] <= 100) {
+						renderMosaic = false;
+						renderBox.setChecked(false);
+					}
+					fullRedraw();
+				}
+				radio.setText("Auto (In Vertex)");
+			}
+			
+			else {
+				// Normal fragment shader precision is enough
+				if(renderMode != RenderMode.SINGLE) {
+					Toast.makeText(this, "Auto-switching to fragment shader",
+							Toast.LENGTH_SHORT).show();
+					renderMode = RenderMode.SINGLE;
+					renderMosaic = false;
+					renderBox.setChecked(false);
+					fullRedraw();
+				}
+				radio.setText("Auto (Single)");
+			}
+		}
+	}
+
 	private int tileCount = -1;
 	
 	@Override
@@ -1284,10 +1381,65 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	}
 	
 	public void showHelp(View view) {
+		String versionName = "X";
+		try {
+			versionName = getPackageManager()
+				    .getPackageInfo(getPackageName(), 0).versionName;
+		} catch (NameNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
 		Dialog helpDia = new Dialog(this);
-		helpDia.setTitle("GPU Mandelbrot v1.00");
+		helpDia.setTitle("GPU Mandelbrot v" + versionName);
 		helpDia.setContentView(R.layout.help_dialog);
 		helpDia.show();
+	}
+	
+	public void showWarning() {
+		AlertDialog.Builder builder = new AlertDialog.Builder(this);
+		String[] checkText = {"Do not ask again"};
+		final boolean[] checkSet = {false};
+		builder.setTitle("Warning")
+			.setMessage("Would you like to try switching to emulated double precision mode?\n\n" +
+				"Some GPU drivers can freeze the system in this mode.")
+		   .setCancelable(false)
+		   .setMultiChoiceItems(checkText, checkSet, new OnMultiChoiceClickListener() {
+				@Override
+				public void onClick(DialogInterface dialog, int which, boolean isChecked) {
+					checkSet[0] = isChecked;
+				}
+			})
+		   .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+		       public void onClick(DialogInterface dialog, int id) {
+		            allowDouble[0] = 1;
+		            setRenderMode(RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX);
+		            
+		            //if(checkSet[0])
+		            	rememberDoubleChoice(true);
+		            	
+		            	dialog.dismiss();
+		       }
+		   })
+		   .setNegativeButton("No", new DialogInterface.OnClickListener() {
+		       public void onClick(DialogInterface dialog, int id) {
+		            allowDouble[0] = 0;
+		            
+		            //if(checkSet[0])
+		            	rememberDoubleChoice(false);
+		            	
+		            	dialog.dismiss();
+		       }
+		   });
+		AlertDialog alert = builder.create();
+		alert.show();
+    }
+	
+	void rememberDoubleChoice(boolean setTo) {
+		SharedPreferences prefs = getSharedPreferences("MANDEL", 0);
+		Editor edit = prefs.edit();
+		edit.putBoolean("allowDouble", setTo);
+		edit.apply();
 	}
 }
 
