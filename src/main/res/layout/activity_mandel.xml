@@ -206,7 +206,7 @@
 
                         <Button
                             android:id="@+id/button"
-                            style="?android:attr/buttonStyleSmall"
+                            style="@android:style/Widget.Holo.Light.Button.Small"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:onClick="toggleModeSettings"
@@ -214,7 +214,7 @@
 
                         <Button
                             android:id="@+id/button5"
-                            style="?android:attr/buttonStyleSmall"
+                            style="@android:style/Widget.Holo.Light.Button.Small"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:onClick="toggleColorSettings"
@@ -222,7 +222,7 @@
 
                         <Button
                             android:id="@+id/button2"
-                            style="?android:attr/buttonStyleSmall"
+                            style="@android:style/Widget.Holo.Light.Button.Small"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:onClick="resetPos"
@@ -230,7 +230,7 @@
 
                         <Button
                             android:id="@+id/button3"
-                            style="?android:attr/buttonStyleSmall"
+                            style="@android:style/Widget.Holo.Light.Button.Small"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:onClick="hideHUD"
@@ -238,7 +238,7 @@
 
                         <Button
                             android:id="@+id/button4"
-                            style="?android:attr/buttonStyleSmall"
+                            style="@android:style/Widget.Holo.Light.Button.Small"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:onClick="saveImage"
@@ -249,7 +249,7 @@
 
                 <Button
                     android:id="@+id/button6"
-                    style="?android:attr/buttonStyleSmall"
+                    style="@android:style/Widget.Holo.Light.Button.Small"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:onClick="showHelp"
@@ -281,7 +281,7 @@
 
     <Button
         android:id="@+id/showButton"
-        style="?android:attr/buttonStyleSmall"
+        style="@android:style/Widget.Holo.Light.Button.Small"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="end"
