@@ -1,0 +1,3 @@
+[submodule "alw3d"]
+	path = alw3d
+	url = https://github.com/betelge/alw3d.git
