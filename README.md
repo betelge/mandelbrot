@@ -1,9 +1,9 @@
 # mandelbrot
 GPU accelerated fractal explorer.
 
-Downloading submodules:
-git submodule init
-git submodule update
+Downloading submodules:  
+git submodule init  
+git submodule update  
 
-Building:
+Building:  
 Open root project in Android Studio.
