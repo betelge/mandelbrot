@@ -1,24 +1,23 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion "24.0.1"
+    compileSdkVersion 30
+    buildToolsVersion '30.0.2'
 
     defaultConfig {
         applicationId "tk.betelge.mandelbrot"
-        minSdkVersion 9
-        targetSdkVersion 21
+        minSdkVersion 14
+        targetSdkVersion 30
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
         }
     }
 }
 
 dependencies {
-    compile 'com.android.support:appcompat-v7:21.0.3'
-    compile project(path: ':alw3d')
+    implementation project(path: ':alw3d')
 }

@@ -31,6 +31,7 @@ import tk.betelge.alw3d.renderer.passes.RenderPass;
 import tk.betelge.alw3d.renderer.passes.SceneRenderPass;
 import tk.betelge.alw3d.renderer.passes.RenderPass.OnRenderPassFinishedListener;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.Dialog;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
@@ -42,7 +43,6 @@ import android.graphics.Bitmap;
 import android.opengl.GLES20;
 import android.opengl.GLException;
 import android.os.Bundle;
-import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.Menu;
@@ -61,7 +61,7 @@ import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
-public class Mandel extends ActionBarActivity implements OnTouchListener,
+public class Mandel extends Activity implements OnTouchListener,
 OnSeekBarChangeListener, OnSurfaceChangedListener, OnCheckedChangeListener,
 CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
@@ -168,7 +168,6 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		// Hide status bar and action bar
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
 	            WindowManager.LayoutParams.FLAG_FULLSCREEN);
-		getSupportActionBar().hide();
 		
 		StringLoader.setContext(this);
 		
