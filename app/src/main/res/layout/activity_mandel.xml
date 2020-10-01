@@ -109,6 +109,18 @@
                             android:layout_height="wrap_content"
                             android:text="Emulate double precision in vertex shader" />
 
+                        <RadioButton
+                            android:id="@+id/radio32F"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Use Open GL ES 3 32 bit Float Buffers" />
+
+                        <RadioButton
+                            android:id="@+id/radio64F"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Use Open GL ES 3 64 bit Emulation" />
+
                         <CheckBox
                             android:id="@+id/mosaicBox"
                             android:layout_width="wrap_content"

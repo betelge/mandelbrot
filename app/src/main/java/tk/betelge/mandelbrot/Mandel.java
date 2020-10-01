@@ -7,8 +7,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
-import tk.betelge.mandelbrot.R;
-
+import tk.betelge.alw3d.renderer.RenderMultiPass;
 import utils.ShaderLoader;
 import utils.StringLoader;
 import tk.betelge.alw3d.Alw3dModel;
@@ -74,6 +73,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private RenderPass mandelPass;
 	private Material mandelMaterial;
 	private Material markMaterial;
+	private Material mandelFloatEndMaterial;
 	private RenderMode renderMode = RenderMode.SINGLE;
 	private boolean renderMosaic = false;
 	private int colorShader;
@@ -82,6 +82,9 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private ShaderProgram mandel64ExpShaderProg;
 	private ShaderProgram mandelInVertexShader;
 	private ShaderProgram mandel64InVertexShader;
+	private ShaderProgram mandelFloatShaderProg, mandelFloatEndShaderProg;
+	private ShaderProgram mandelFloat64ShaderProg;
+	private int FLOAT_DRAW_STEPS = 100;
 	private float scale = 1f;
 	private float asp = 1f;
 	private float scaleMandelX = 1f, scaleMandelY = 1f;
@@ -101,7 +104,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	private SceneRenderPass mandelVertexPass;
 	private SceneRenderPass mandelVertexMosaicPass;
-	
+	private RenderMultiPass mandelFloatPass;
+
 	private RenderPass finalPass;
 	private Material finalMaterial;
 	private ShaderProgram finalShaderProg;
@@ -117,6 +121,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private Uniform gradUniform;
 	private Uniform col1Uniform;
 	private Uniform col2Uniform;
+
+	private Uniform currentFloatIterationUniform;
 		
 	private ScaleGestureDetector scaleDetector;
 	private GestureDetector gestureDetector;
@@ -139,14 +145,19 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private Bitmap screenshotBitmap;
 	
 	final private int[] allowDouble = {-1};
+
+	private boolean hasFloatBuffers;
+	private FBO mandelFloatFBO, mandelFloatPongFBO;
 	
 	static public enum RenderMode {
 		SINGLE(0x001),
 		EMULATED_DOUBLE(0x002),
 		EXP_EMULATED_DOUBLE(0x003),
 		SINGLE_IN_VERTEX(0x004),
-		EXP_EMULATED_DOUBLE_IN_VERTEX(0x005);
-		
+		EXP_EMULATED_DOUBLE_IN_VERTEX(0x005),
+		FLOAT_TEXTURE(0x006),
+		FLOAT_TEXTURE_EMULATED_DOUBLE(0x007);
+
 		int value;
 		
 		RenderMode(int value) {
@@ -197,14 +208,42 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		colVec2.normalizeThis();
 		col2Uniform = new Uniform("col2", colVec2.x, colVec2.y, colVec2.z);
 		mandelMaterial.addUniform(col2Uniform);
-		
+
+		// Used for intermediate float draws
+		currentFloatIterationUniform = new Uniform("iteration", 0, (float) FLOAT_DRAW_STEPS);
+		mandelMaterial.addUniform(currentFloatIterationUniform);
+
+		mandelFloatEndMaterial = new Material(mandelFloatEndShaderProg);
+		mandelFloatEndMaterial.addUniform(maxInterationsUniform);
+		mandelFloatEndMaterial.addUniform(gradUniform);
+		mandelFloatEndMaterial.addUniform(col1Uniform);
+		mandelFloatEndMaterial.addUniform(col2Uniform);
+		mandelFloatEndMaterial.addUniform(currentFloatIterationUniform);
+
 		
 		mandelVertexPass = new SceneRenderPass(new Node(),
 				/*Ignored dummy camera*/ new CameraNode(asp, asp, asp, asp)/*,
 				mandelFBO*/);
 		mandelVertexMosaicPass = new SceneRenderPass(new Node(),
 				/*dummy*/new CameraNode(1f, 1f, 0.01f, 1000f));
-		
+		// TODO: Break out into separate file
+		ClearPass floatClearPass = new ClearPass(ClearPass.COLOR_BUFFER_BIT);
+		ClearPass floatClearPass2 = new ClearPass(ClearPass.COLOR_BUFFER_BIT);
+		floatClearPass.setOneTime(true);
+		floatClearPass2.setOneTime(true);
+		QuadRenderPass interPass = new QuadRenderPass(mandelMaterial, true);
+		QuadRenderPass endPass = new QuadRenderPass(mandelFloatEndMaterial, mandelFBO);
+		final List<RenderPass> floatRenderPasses = new ArrayList<>();
+		floatRenderPasses.add(floatClearPass);
+		floatRenderPasses.add(floatClearPass2);
+		floatRenderPasses.add(interPass);
+		floatRenderPasses.add(endPass);
+		mandelFloatPass = new RenderMultiPass() {
+			@Override
+			public List<RenderPass> getRenderPasses() {
+				return floatRenderPasses;
+			}
+		};
 
 		scaleDetector = new ScaleGestureDetector(this, new ScaleListener());
 		gestureDetector = new GestureDetector(this, new GestureListener());
@@ -223,7 +262,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		renderMosaicToast = Toast.makeText(this, "Auto-turning on render mosaic", Toast.LENGTH_SHORT);
 		
 		model = new Alw3dModel();
-		view = new Alw3dView(this, model);
+		view = new Alw3dView(this, model, 3);
+		//view.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
 		setContentView(R.layout.activity_mandel);
 				
 		view.setOnSurfaceChangedListener(this);
@@ -312,6 +352,10 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				new int[]{R.raw.packfloat, R.raw.hsv2rgb, colorShader}, null);
 		mandel64InVertexShader = ShaderLoader.loadShaderProgram(R.raw.mandel64exp_in_vert_v, R.raw.mandel64exp_in_vert_f,
 				new int[]{R.raw.doubleemulation, R.raw.hsv2rgb, colorShader}, null);
+		mandelFloatShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel_float_v, R.raw.mandel_float_f,
+				null, null);
+		mandelFloatEndShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel_v, R.raw.mandel_float_end_f,
+				null, new int[]{R.raw.hsv2rgb, colorShader});
 		
 		finalShaderProg = ShaderLoader.loadShaderProgram(R.raw.final_v, R.raw.final_f);
 	}
@@ -332,6 +376,14 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			break;
 		case EXP_EMULATED_DOUBLE_IN_VERTEX:
 			mandelMaterial.setShaderProgram(mandel64InVertexShader);
+			break;
+		case FLOAT_TEXTURE:
+			mandelMaterial.setShaderProgram(mandelFloatShaderProg);
+			mandelFloatEndMaterial.setShaderProgram(mandelFloatEndShaderProg);
+			break;
+		case FLOAT_TEXTURE_EMULATED_DOUBLE:
+			mandelMaterial.setShaderProgram(mandelFloatShaderProg);
+			mandelFloatEndMaterial.setShaderProgram(mandelFloatEndShaderProg);
 			break;
 		default:
 			mandelMaterial.setShaderProgram(mandelShaderProg);
@@ -445,7 +497,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		if(w == 0 || h == 0) return;
 		
 		// This will be done first after the view receives it's size in the layout.
-		
+
 		//Pause rendering while we do this
 		synchronized (model.getRenderPasses()) {
 			model.getRenderPasses().clear();
@@ -454,10 +506,25 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		
 		setScaleMandelUniform(scale);
 		setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
-		
-		
-		Texture mandelTexture = new Texture(null, Texture.TextureType.TEXTURE_2D, view.getWidth(),
-				view.getHeight(), Texture.TexelType.UBYTE, Texture.Format.GL_RGB, Texture.Filter.NEAREST,
+
+		hasFloatBuffers = view.getRenderer().hasFloatBuffers();
+		if(hasFloatBuffers) {
+			Texture mandelFloatTexture = new Texture(null, Texture.TextureType.TEXTURE_2D,
+					w, h, Texture.TexelType.FLOAT, Texture.Format.GL_RGBA32F, Texture.Filter.NEAREST,
+					Texture.WrapMode.CLAMP_TO_EDGE);
+			mandelFloatFBO = new FBO(mandelFloatTexture, w, h);
+
+			Texture mandelFloatPongTexture = new Texture(null, Texture.TextureType.TEXTURE_2D,
+					w, h, Texture.TexelType.FLOAT, Texture.Format.GL_RGBA32F, Texture.Filter.NEAREST,
+					Texture.WrapMode.CLAMP_TO_EDGE);
+			mandelFloatPongFBO = new FBO(mandelFloatPongTexture, w, h);
+
+			setupFloatPass(false);
+		}
+
+
+		Texture mandelTexture = new Texture(null, Texture.TextureType.TEXTURE_2D,
+				w, h, Texture.TexelType.UBYTE, Texture.Format.GL_RGB, Texture.Filter.NEAREST,
 				Texture.WrapMode.CLAMP_TO_EDGE);
 		// TODO: Are we leaking video memory here when we loose the old FBO?
 		mandelFBO = new FBO(mandelTexture, w, h);
@@ -607,12 +674,21 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			model.getRenderPasses().clear();
 			clearPass = new ClearPass(GLES20.GL_COLOR_BUFFER_BIT, null);
 			model.addRenderPass(clearPass);
+			mandelMaterial.getTextures().clear();
 			setCorrectMandelPass();
 			mandelVertexPass.setFbo(mandelFBO);
 			mandelVertexMosaicPass.setOnRenderPassFinishedListener(this);
 			mandelVertexMosaicPass.setFbo(mandelFBO);
 			mandelPass.setOneTime(true);
 			mandelPass.setSilent(false);
+			List<RenderPass> mandelFloatInternalPasses = mandelFloatPass.getRenderPasses();
+			mandelFloatInternalPasses.get(0).setFbo(mandelFloatPongFBO);
+			mandelFloatInternalPasses.get(1).setFbo(mandelFloatFBO);
+			mandelFloatInternalPasses.get(0).setSilent(false);
+			mandelFloatInternalPasses.get(1).setSilent(false);
+			mandelFloatInternalPasses.get(mandelFloatInternalPasses.size() - 1).setFbo(mandelFBO);
+			mandelFloatPass.setOnRenderPassFinishedListener(this);
+			currentFloatIterationUniform.set(0, (float) FLOAT_DRAW_STEPS);
 			model.addRenderPass(mandelPass);
 			finalPass = new QuadRenderPass(finalMaterial);
 			model.addRenderPass(finalPass);
@@ -621,9 +697,28 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			errorPass.setOnGlErrorListener(this);
 		}
 	}
+
+	private void setupFloatPass(boolean pong) {
+		if(mandelFloatFBO == null || mandelFloatPongFBO == null)
+			return;
+		mandelFloatPass.getRenderPasses().get(2).setFbo(pong ? mandelFloatPongFBO : mandelFloatFBO);
+		mandelMaterial.getTextures().clear();
+		mandelMaterial.addTexture("tex", (Texture) (pong ? mandelFloatFBO.getAttachables()[0] : mandelFloatPongFBO.getAttachables()[0]));
+		mandelFloatEndMaterial.getTextures().clear();
+		mandelFloatEndMaterial.addTexture("tex", (Texture) (pong ? mandelFloatPongFBO.getAttachables()[0] : mandelFloatFBO.getAttachables()[0]));
+	}
 	
 	private void setCorrectMandelPass() {
-		if(renderMode == RenderMode.SINGLE_IN_VERTEX ||
+		if(renderMode == RenderMode.FLOAT_TEXTURE) {
+			mandelPass = mandelFloatPass;
+			currentFloatIterationUniform.set(0, (float) FLOAT_DRAW_STEPS);
+			mandelFloatPass.getRenderPasses().get(0).setFbo(mandelFloatPongFBO);
+			mandelFloatPass.getRenderPasses().get(1).setFbo(mandelFloatFBO);
+			mandelFloatPass.getRenderPasses().get(0).setSilent(false);
+			mandelFloatPass.getRenderPasses().get(1).setSilent(false);
+			setupFloatPass(false);
+		}
+		else if(renderMode == RenderMode.SINGLE_IN_VERTEX ||
 				renderMode == RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX) {
 			if(renderMosaic) {
 				mandelPass = mandelVertexMosaicPass;
@@ -895,13 +990,11 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	public void onStopTrackingTouch(SeekBar arg0) {
 		if(arg0.getId() == R.id.iterSeekBar) {
 			maxInterationsUniform.set(arg0.getProgress());
-			resetVertexMosaic();
-			mandelPass.setSilent(false);
+			fullRedraw();
 		}
 		else if(arg0.getId() == R.id.gradBar) {
 			gradUniform.set(gradFunc(arg0.getProgress()));
-			resetVertexMosaic();
-			mandelPass.setSilent(false);
+			fullRedraw();
 		}
 	}
 
@@ -943,6 +1036,12 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 					break;
 				}*/
 				renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
+				break;
+			case R.id.radio32F:
+				renderMode = RenderMode.FLOAT_TEXTURE;
+				break;
+			case R.id.radio64F:
+				renderMode = RenderMode.FLOAT_TEXTURE;
 				break;
 			default:
 				renderMode = RenderMode.SINGLE;
@@ -1241,7 +1340,21 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	@Override
 	public void onRenderPassFinished(RenderPass pass) {
-		if(pass == mandelVertexMosaicPass) {
+		if(pass == mandelFloatPass) {
+			float maxIterations = maxInterationsUniform.getFloats()[0];
+			if(currentFloatIterationUniform.getFloats()[0] < maxIterations) {
+				float[] iterations = currentFloatIterationUniform.getFloats();
+				iterations[0] += FLOAT_DRAW_STEPS;
+				iterations[1] = Math.min(FLOAT_DRAW_STEPS, maxIterations - iterations[0]);
+				currentFloatIterationUniform.set(iterations[0], iterations[1]);
+
+				boolean pong = mandelFloatPass.getRenderPasses().get(2).getFbo() == mandelFloatPongFBO;
+				setupFloatPass(!pong);
+
+				pass.setSilent(false);
+			}
+		}
+		else if(pass == mandelVertexMosaicPass) {
 			Object[] parts =
 					((SceneRenderPass)pass).getRootNode().getChildren().toArray();
 			

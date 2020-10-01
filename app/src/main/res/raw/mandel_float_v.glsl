@@ -1,15 +1,15 @@
-
-attribute vec3 position;
+#version 300 es
+in vec3 position;
 
 uniform vec2 scale;
 uniform vec2 offset;
 
-varying vec2 c;
-varying vec2 uv;
+out vec2 c;
+out vec2 uv;
 
 void main(void)
 {
-	uv = position.xy * .5 + .5;
+    uv = position.xy * .5 + .5;
 	c = 2.*(scale*position.xy + offset);
 	gl_Position = vec4(position, 1.);
 }
