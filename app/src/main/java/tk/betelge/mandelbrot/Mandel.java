@@ -84,7 +84,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private ShaderProgram mandel64InVertexShader;
 	private ShaderProgram mandelFloatShaderProg, mandelFloatEndShaderProg;
 	private ShaderProgram mandelFloat64ShaderProg;
-	private int FLOAT_DRAW_STEPS = 100;
+	private int FLOAT_DRAW_STEPS = 128;
 	private float scale = 1f;
 	private float asp = 1f;
 	private float scaleMandelX = 1f, scaleMandelY = 1f;
@@ -148,6 +148,9 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 
 	private boolean hasFloatBuffers;
 	private FBO mandelFloatFBO, mandelFloatPongFBO;
+
+	private SeekBar iterSeekBar;
+	private int maxIterationsOld = 1024, maxIterations = 1024 * 4;
 	
 	static public enum RenderMode {
 		SINGLE(0x001),
@@ -271,8 +274,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		frameLayout.addView(view, 0);
 		view.setOnTouchListener(this);
 		
-		SeekBar iterSeekBar = (SeekBar)findViewById(R.id.iterSeekBar);
-		iterSeekBar.setMax(1024);
+		iterSeekBar = (SeekBar)findViewById(R.id.iterSeekBar);
+		iterSeekBar.setMax(maxIterationsOld);
 		iterSeekBar.setProgress(200);
 		iterSeekBar.setOnSeekBarChangeListener(this);
 		
@@ -1016,18 +1019,23 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			switch(arg0.getCheckedRadioButtonId()) {
 			case R.id.radioA:
 				setAutoMode();
+				iterSeekBar.setMax(maxIterationsOld);
 				break;
 			case R.id.radioS:
 				renderMode = RenderMode.SINGLE;
+				iterSeekBar.setMax(maxIterationsOld);
 				break;
 			case R.id.radioED:
 				renderMode = RenderMode.EMULATED_DOUBLE;
+				iterSeekBar.setMax(maxIterationsOld);
 				break;
 			case R.id.radioExpED:
 				renderMode = RenderMode.EXP_EMULATED_DOUBLE;
+				iterSeekBar.setMax(maxIterationsOld);
 		        break;
 			case R.id.radioSV:
 				renderMode = RenderMode.SINGLE_IN_VERTEX;
+				iterSeekBar.setMax(maxIterationsOld);
 				break;
 			case R.id.radioEDV:
 				/*if(allowDouble[0] == -1) {
@@ -1036,15 +1044,19 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 					break;
 				}*/
 				renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
+				iterSeekBar.setMax(maxIterationsOld);
 				break;
 			case R.id.radio32F:
 				renderMode = RenderMode.FLOAT_TEXTURE;
+				iterSeekBar.setMax(maxIterations);
 				break;
 			case R.id.radio64F:
 				renderMode = RenderMode.FLOAT_TEXTURE;
+				iterSeekBar.setMax(maxIterations);
 				break;
 			default:
 				renderMode = RenderMode.SINGLE;
+				iterSeekBar.setMax(maxIterationsOld);
 				break;
 			}
 			
