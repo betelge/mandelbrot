@@ -1,5 +1,6 @@
 #version 300 es
 precision highp float;
+precision highp int;
 
 uniform float MAX_ITER;
 uniform vec2 iteration; // (iteration, steps)

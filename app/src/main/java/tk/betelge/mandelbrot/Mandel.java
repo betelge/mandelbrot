@@ -357,7 +357,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				new int[]{R.raw.doubleemulation, R.raw.hsv2rgb, colorShader}, null);
 		mandelFloatShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel_float_v, R.raw.mandel_float_f,
 				null, null);
-		mandelFloatEndShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel_v, R.raw.mandel_float_end_f,
+		mandelFloatEndShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel_float_v, R.raw.mandel_float_end_f,
 				null, new int[]{R.raw.hsv2rgb, colorShader});
 		
 		finalShaderProg = ShaderLoader.loadShaderProgram(R.raw.final_v, R.raw.final_f);
