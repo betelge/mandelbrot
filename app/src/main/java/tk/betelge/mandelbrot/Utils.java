@@ -5,15 +5,18 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Calendar;
-import java.util.Random;
+import java.util.Objects;
 
 import android.app.Activity;
-import android.content.Context;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.CompressFormat;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.view.View;
@@ -46,45 +49,80 @@ public class Utils {
 	}
 	
 	public static Bitmap saveBitmapToFile(Activity activity, Bitmap bitmap) {
-		String mPath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString();
-		File imageFile = new File(mPath);
-		boolean create = imageFile.mkdirs();
-		boolean canWrite = imageFile.canWrite();
 		Calendar cal = Calendar.getInstance();
-		String date = cal.get(Calendar.YEAR) + "-" + cal.get(Calendar.MONTH) +"-" + cal.get(Calendar.DATE);
-		
-		String filename = null;
-		int i = 0;
-		while (imageFile.exists()) {
-			i++;
-			filename = date+"_mandelbrot" + i + ".png";
-			imageFile = new File(mPath, filename);
-			boolean canWrite2 = imageFile.canWrite();
-			
+		String date = cal.get(Calendar.YEAR) + "-" + cal.get(Calendar.MONTH) + "-" + cal.get(Calendar.DATE)
+				+ "-" + cal.get(Calendar.HOUR) + "-" + cal.get(Calendar.MINUTE) + "-" + cal.get(Calendar.SECOND);
+
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+			ContentResolver resolver = activity.getContentResolver();
+			ContentValues contentValues = new ContentValues();
+			contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, "mandelbrot_" + date + ".png");
+			contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "image/png");
+			contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES);
+			contentValues.put(MediaStore.MediaColumns.IS_PENDING, true);
+			Uri imageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues);
+			try {
+				OutputStream fos = resolver.openOutputStream(Objects.requireNonNull(imageUri));
+
+				bitmap.compress(CompressFormat.PNG, 90, fos);
+				fos.flush();
+				fos.close();
+
+				contentValues.put(MediaStore.MediaColumns.IS_PENDING, false);
+				resolver.update(imageUri, contentValues, null, null);
+
+				displaySuccesToast(activity);
+			} catch (FileNotFoundException e) {
+				displayFileError(activity);
+				e.printStackTrace();
+			} catch (IOException e) {
+				displayFileError(activity);
+				e.printStackTrace();
+			}
+
+
 		}
-		
-		try {
+		else {
+			String mPath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString();
+			File imageFile = new File(mPath);
+			boolean create = imageFile.mkdirs();
+			boolean canWrite = imageFile.canWrite();
+
+			String filename = null;
+			int i = 0;
+			while (imageFile.exists()) {
+				i++;
+				filename = date + "_mandelbrot" + i + ".png";
+				imageFile = new File(mPath, filename);
+				boolean canWrite2 = imageFile.canWrite();
+
+			}
+
 			ByteArrayOutputStream bos = new ByteArrayOutputStream();
-			/*resultB*/bitmap.compress(CompressFormat.PNG, 90, bos);
+			/*resultB*/
+			bitmap.compress(CompressFormat.PNG, 90, bos);
 			byte[] bitmapdata = bos.toByteArray();
 
-			//write the bytes in file
-			FileOutputStream fos = new FileOutputStream(imageFile);
-			fos.write(bitmapdata);
-			fos.flush();
-			fos.close();    
-			
-			Intent intent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-					intent.setData(Uri.fromFile(imageFile));
-					activity.sendBroadcast(intent);
-					
-			displaySuccesToast(activity);
-		} catch (FileNotFoundException e) {
-			displayFileError(activity);
-			e.printStackTrace();
-		} catch (IOException e) {
-			displayFileError(activity);
-			e.printStackTrace();
+			try {
+				//write the bytes in file
+				FileOutputStream fos = new FileOutputStream(imageFile);
+				fos.write(bitmapdata);
+				fos.flush();
+				fos.close();
+
+				Intent intent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+				intent.setData(Uri.fromFile(imageFile));
+				activity.sendBroadcast(intent);
+
+				displaySuccesToast(activity);
+			} catch (FileNotFoundException e) {
+				displayFileError(activity);
+				e.printStackTrace();
+			} catch (IOException e) {
+				displayFileError(activity);
+				e.printStackTrace();
+			}
+
 		}
 		return bitmap;
 	}
