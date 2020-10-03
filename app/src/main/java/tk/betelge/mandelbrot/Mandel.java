@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
+import tk.betelge.alw3d.renderer.FBOAttachable;
 import tk.betelge.alw3d.renderer.RenderMultiPass;
 import utils.ShaderLoader;
 import utils.StringLoader;
@@ -83,8 +84,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private ShaderProgram mandelInVertexShader;
 	private ShaderProgram mandel64InVertexShader;
 	private ShaderProgram mandelFloatShaderProg, mandelFloatEndShaderProg;
-	private ShaderProgram mandelFloat64ShaderProg;
-	private int FLOAT_DRAW_STEPS = 128;
+	private ShaderProgram mandelFloat64ShaderProg, mandelFloat64EndShaderProg;
+	private int FLOAT_DRAW_STEPS = 32;
 	private float scale = 1f;
 	private float asp = 1f;
 	private float scaleMandelX = 1f, scaleMandelY = 1f;
@@ -234,7 +235,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		ClearPass floatClearPass2 = new ClearPass(ClearPass.COLOR_BUFFER_BIT);
 		floatClearPass.setOneTime(true);
 		floatClearPass2.setOneTime(true);
-		QuadRenderPass interPass = new QuadRenderPass(mandelMaterial, true);
+		QuadRenderPass interPass = new QuadRenderPass(mandelMaterial);
+		interPass.setUseBigTriangle(true);
 		QuadRenderPass endPass = new QuadRenderPass(mandelFloatEndMaterial, mandelFBO);
 		final List<RenderPass> floatRenderPasses = new ArrayList<>();
 		floatRenderPasses.add(floatClearPass);
@@ -359,6 +361,10 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				null, null);
 		mandelFloatEndShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel_float_v, R.raw.mandel_float_end_f,
 				null, new int[]{R.raw.hsv2rgb, colorShader});
+		mandelFloat64ShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel_float64_v, R.raw.mandel_float64_f,
+				null, new int[]{R.raw.doubleemulation});
+		mandelFloat64EndShaderProg = ShaderLoader.loadShaderProgram(R.raw.mandel_float64_v, R.raw.mandel_float64_end_f,
+				null, new int[]{R.raw.doubleemulation, R.raw.hsv2rgb, colorShader});
 		
 		finalShaderProg = ShaderLoader.loadShaderProgram(R.raw.final_v, R.raw.final_f);
 	}
@@ -381,12 +387,15 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			mandelMaterial.setShaderProgram(mandel64InVertexShader);
 			break;
 		case FLOAT_TEXTURE:
+			((QuadRenderPass)mandelFloatPass.getRenderPasses().get(2)).setNumBuffers(1);
 			mandelMaterial.setShaderProgram(mandelFloatShaderProg);
 			mandelFloatEndMaterial.setShaderProgram(mandelFloatEndShaderProg);
 			break;
 		case FLOAT_TEXTURE_EMULATED_DOUBLE:
-			mandelMaterial.setShaderProgram(mandelFloatShaderProg);
-			mandelFloatEndMaterial.setShaderProgram(mandelFloatEndShaderProg);
+			((QuadRenderPass)mandelFloatPass.getRenderPasses().get(2)).setNumBuffers(2);
+			mandelMaterial.setShaderProgram(mandelFloat64ShaderProg);
+			mandelMaterial.getTextures().clear();
+			mandelFloatEndMaterial.setShaderProgram(mandelFloat64EndShaderProg);
 			break;
 		default:
 			mandelMaterial.setShaderProgram(mandelShaderProg);
@@ -512,15 +521,23 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 
 		hasFloatBuffers = view.getRenderer().hasFloatBuffers();
 		if(hasFloatBuffers) {
-			Texture mandelFloatTexture = new Texture(null, Texture.TextureType.TEXTURE_2D,
-					w, h, Texture.TexelType.FLOAT, Texture.Format.GL_RGBA32F, Texture.Filter.NEAREST,
-					Texture.WrapMode.CLAMP_TO_EDGE);
-			mandelFloatFBO = new FBO(mandelFloatTexture, w, h);
+			Texture[] mandelFloatTextures = {
+					new Texture(null, Texture.TextureType.TEXTURE_2D,
+							w, h, Texture.TexelType.FLOAT, Texture.Format.GL_RGBA32F,
+							Texture.Filter.NEAREST, Texture.WrapMode.CLAMP_TO_EDGE),
+					new Texture(null, Texture.TextureType.TEXTURE_2D,
+							w, h, Texture.TexelType.FLOAT, Texture.Format.GL_R32F,
+							Texture.Filter.NEAREST, Texture.WrapMode.CLAMP_TO_EDGE)};
+			mandelFloatFBO = new FBO(mandelFloatTextures, w, h);
 
-			Texture mandelFloatPongTexture = new Texture(null, Texture.TextureType.TEXTURE_2D,
-					w, h, Texture.TexelType.FLOAT, Texture.Format.GL_RGBA32F, Texture.Filter.NEAREST,
-					Texture.WrapMode.CLAMP_TO_EDGE);
-			mandelFloatPongFBO = new FBO(mandelFloatPongTexture, w, h);
+			Texture[] mandelFloatPongTextures = {
+					new Texture(null, Texture.TextureType.TEXTURE_2D,
+							w, h, Texture.TexelType.FLOAT, Texture.Format.GL_RGBA32F,
+							Texture.Filter.NEAREST, Texture.WrapMode.CLAMP_TO_EDGE),
+					new Texture(null, Texture.TextureType.TEXTURE_2D,
+							w, h, Texture.TexelType.FLOAT, Texture.Format.GL_R32F,
+							Texture.Filter.NEAREST, Texture.WrapMode.CLAMP_TO_EDGE)};
+			mandelFloatPongFBO = new FBO(mandelFloatPongTextures, w, h);
 
 			setupFloatPass(false);
 		}
@@ -706,13 +723,19 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			return;
 		mandelFloatPass.getRenderPasses().get(2).setFbo(pong ? mandelFloatPongFBO : mandelFloatFBO);
 		mandelMaterial.getTextures().clear();
-		mandelMaterial.addTexture("tex", (Texture) (pong ? mandelFloatFBO.getAttachables()[0] : mandelFloatPongFBO.getAttachables()[0]));
+		mandelMaterial.addTexture("tex",
+				(Texture) (pong ? mandelFloatFBO.getAttachables()[0] : mandelFloatPongFBO.getAttachables()[0]));
+		mandelMaterial.addTexture("counterTex",
+				(Texture) (pong ? mandelFloatFBO.getAttachables()[1] : mandelFloatPongFBO.getAttachables()[1]));
 		mandelFloatEndMaterial.getTextures().clear();
-		mandelFloatEndMaterial.addTexture("tex", (Texture) (pong ? mandelFloatPongFBO.getAttachables()[0] : mandelFloatFBO.getAttachables()[0]));
+		mandelFloatEndMaterial.addTexture("tex",
+				(Texture) (pong ? mandelFloatPongFBO.getAttachables()[0] : mandelFloatFBO.getAttachables()[0]));
+		mandelFloatEndMaterial.addTexture("counterTex",
+				(Texture) (pong ? mandelFloatPongFBO.getAttachables()[1] : mandelFloatFBO.getAttachables()[1]));
 	}
 	
 	private void setCorrectMandelPass() {
-		if(renderMode == RenderMode.FLOAT_TEXTURE) {
+		if(renderMode == RenderMode.FLOAT_TEXTURE || renderMode == RenderMode.FLOAT_TEXTURE_EMULATED_DOUBLE) {
 			mandelPass = mandelFloatPass;
 			currentFloatIterationUniform.set(0, (float) FLOAT_DRAW_STEPS);
 			mandelFloatPass.getRenderPasses().get(0).setFbo(mandelFloatPongFBO);
@@ -1051,7 +1074,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				iterSeekBar.setMax(maxIterations);
 				break;
 			case R.id.radio64F:
-				renderMode = RenderMode.FLOAT_TEXTURE;
+				renderMode = RenderMode.FLOAT_TEXTURE_EMULATED_DOUBLE;
 				iterSeekBar.setMax(maxIterations);
 				break;
 			default:
