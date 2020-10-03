@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
-import tk.betelge.alw3d.renderer.FBOAttachable;
 import tk.betelge.alw3d.renderer.RenderMultiPass;
 import utils.ShaderLoader;
 import utils.StringLoader;
@@ -32,12 +31,15 @@ import tk.betelge.alw3d.renderer.passes.SceneRenderPass;
 import tk.betelge.alw3d.renderer.passes.RenderPass.OnRenderPassFinishedListener;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.Dialog;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnMultiChoiceClickListener;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
+import android.content.pm.ConfigurationInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.graphics.Bitmap;
 import android.opengl.GLES20;
@@ -147,6 +149,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	
 	final private int[] allowDouble = {-1};
 
+	private int glVersion;
 	private boolean hasFloatBuffers;
 	private FBO mandelFloatFBO, mandelFloatPongFBO;
 
@@ -185,6 +188,11 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	            WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		
 		StringLoader.setContext(this);
+
+		ActivityManager activityManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+		ConfigurationInfo configurationInfo = activityManager.getDeviceConfigurationInfo();
+
+		glVersion = configurationInfo.reqGlEsVersion;
 		
 		// Load shaders
 		colorShader = R.raw.pastelhsvcolor;
@@ -267,7 +275,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		renderMosaicToast = Toast.makeText(this, "Auto-turning on render mosaic", Toast.LENGTH_SHORT);
 		
 		model = new Alw3dModel();
-		view = new Alw3dView(this, model, 3);
+		int glContextClientVersion = glVersion >= 0x30000 ? 3 : 2;
+		view = new Alw3dView(this, model, glContextClientVersion);
 		//view.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
 		setContentView(R.layout.activity_mandel);
 				
@@ -520,6 +529,10 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		setOffsetMandelUniforms(offsetMandelX, offsetMandelY);
 
 		hasFloatBuffers = view.getRenderer().hasFloatBuffers();
+
+		// Only use float buffers in combination with OpenGL ES 3
+		hasFloatBuffers = hasFloatBuffers && glVersion >= 0x30000;
+
 		if(hasFloatBuffers) {
 			Texture[] mandelFloatTextures = {
 					new Texture(null, Texture.TextureType.TEXTURE_2D,
@@ -540,6 +553,11 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			mandelFloatPongFBO = new FBO(mandelFloatPongTextures, w, h);
 
 			setupFloatPass(false);
+		}
+		else {
+			// Float buffers not supported
+			findViewById(R.id.radio32F).setEnabled(false);
+			findViewById(R.id.radio64F).setEnabled(false);
 		}
 
 
