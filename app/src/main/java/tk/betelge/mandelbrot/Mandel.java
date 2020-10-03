@@ -1331,6 +1331,40 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			int w = view.getWidth();
 			if(w == 0) return;
 			int W = 800;
+
+
+			if(hasFloatBuffers) {
+				if(scale*w/W < vertexSingleLimit) {
+					if(renderMode != RenderMode.FLOAT_TEXTURE_EMULATED_DOUBLE) {
+						runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+								Toast.makeText(Mandel.this, "Auto-switching to emulated 64 bit precision",
+										Toast.LENGTH_SHORT).show();
+							}
+						});
+						renderMode = RenderMode.FLOAT_TEXTURE_EMULATED_DOUBLE;
+						fullRedraw();
+					}
+					radio.setText("Auto (Emu 64 bit in OpenGL ES 3)");
+				}
+				else {
+					if(renderMode != RenderMode.FLOAT_TEXTURE) {
+						runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+								Toast.makeText(Mandel.this, "Auto-switching to 32 bit precision",
+										Toast.LENGTH_SHORT).show();
+							}
+						});
+						renderMode = RenderMode.FLOAT_TEXTURE;
+						fullRedraw();
+					}
+					radio.setText("Auto (32 bit in OpenGL ES 3)");
+				}
+
+				return;
+			}
 			
 			// TODO: Doesn't work!! Wrong value from preferences.
 			if(!getSharedPreferences("MANDEL", 0).getBoolean("allowDouble", false));
