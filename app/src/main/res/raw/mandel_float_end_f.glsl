@@ -16,14 +16,16 @@ void main()
 {
 	vec3 z = texture(tex, uv).xyz;
 		
-	int i = int(z.z);
+	uint i = uint(z.z);
 	float radius = z.x*z.x + z.y*z.y;
 	float endIter = iteration.x + iteration.y;
 
-	if(i == int(endIter) && i < int(MAX_ITER))
-		discard;
+	if(i == uint(endIter) && i < uint(MAX_ITER)) {
+		outColor = vec4(0., 0., 0., endIter / MAX_ITER);
+		return;
+	}
 
-	float speed2 = (i == int(MAX_ITER) ? 0.0 : float(i));
+	float speed2 = (i == uint(MAX_ITER) ? 0.0 : float(i));
 
 	outColor = color(speed2, radius, MAX_ITER);
 }

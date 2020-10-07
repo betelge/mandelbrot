@@ -87,7 +87,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private ShaderProgram mandel64InVertexShader;
 	private ShaderProgram mandelFloatShaderProg, mandelFloatEndShaderProg;
 	private ShaderProgram mandelFloat64ShaderProg, mandelFloat64EndShaderProg;
-	private int FLOAT_DRAW_STEPS = 32;
+	private int FLOAT_DRAW_STEPS = 8;
 	private float scale = 1f;
 	private float asp = 1f;
 	private float scaleMandelX = 1f, scaleMandelY = 1f;
@@ -148,13 +148,14 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	private Bitmap screenshotBitmap;
 	
 	final private int[] allowDouble = {-1};
+	final private int[] allowLegacy = {-1};
 
 	private int glVersion;
 	private boolean hasFloatBuffers;
 	private FBO mandelFloatFBO, mandelFloatPongFBO;
 
 	private SeekBar iterSeekBar;
-	private int maxIterationsOld = 1024, maxIterations = 1024 * 4;
+	final private int maxIterationsOld = 1024, maxIterations = 1024 * 128;
 	
 	static public enum RenderMode {
 		SINGLE(0x001),
@@ -231,6 +232,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		mandelFloatEndMaterial.addUniform(col1Uniform);
 		mandelFloatEndMaterial.addUniform(col2Uniform);
 		mandelFloatEndMaterial.addUniform(currentFloatIterationUniform);
+		mandelFloatEndMaterial.setBlending(true);
 
 		
 		mandelVertexPass = new SceneRenderPass(new Node(),
@@ -353,6 +355,15 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				R.raw.simple_v, R.raw.white_f));
 		
 		setRenderMode(renderMode);
+	}
+
+	private void setMaxIterations(int maxIterations) {
+		iterSeekBar.setMax(maxIterations);
+		float[] values = maxInterationsUniform.getFloats();
+		if(values[0] > maxIterations) {
+			values[0] = maxIterations;
+			maxInterationsUniform.set(values[0]);
+		}
 	}
 	
 	private void loadShaders(int colorShader) {
@@ -534,6 +545,10 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		hasFloatBuffers = hasFloatBuffers && glVersion >= 0x30000;
 
 		if(hasFloatBuffers) {
+			setMaxIterations(maxIterations);
+			iterSeekBar.setProgress(32 * 1024);
+			maxInterationsUniform.set(32 * 1024);
+
 			Texture[] mandelFloatTextures = {
 					new Texture(null, Texture.TextureType.TEXTURE_2D,
 							w, h, Texture.TexelType.FLOAT, Texture.Format.GL_RGBA32F,
@@ -1059,24 +1074,25 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		
 			switch(arg0.getCheckedRadioButtonId()) {
 			case R.id.radioA:
+				setMaxIterations(hasFloatBuffers ? maxIterations : maxIterationsOld);
 				setAutoMode();
-				iterSeekBar.setMax(maxIterationsOld);
+				fullRedraw();
 				break;
 			case R.id.radioS:
-				renderMode = RenderMode.SINGLE;
-				iterSeekBar.setMax(maxIterationsOld);
+				setMaxIterations(maxIterationsOld);
+				setLegacyRenderMode(RenderMode.SINGLE);
 				break;
 			case R.id.radioED:
-				renderMode = RenderMode.EMULATED_DOUBLE;
-				iterSeekBar.setMax(maxIterationsOld);
+				setMaxIterations(maxIterationsOld);
+				setLegacyRenderMode(RenderMode.EMULATED_DOUBLE);
 				break;
 			case R.id.radioExpED:
-				renderMode = RenderMode.EXP_EMULATED_DOUBLE;
-				iterSeekBar.setMax(maxIterationsOld);
+				setMaxIterations(maxIterationsOld);
+				setLegacyRenderMode(RenderMode.EXP_EMULATED_DOUBLE);
 		        break;
 			case R.id.radioSV:
-				renderMode = RenderMode.SINGLE_IN_VERTEX;
-				iterSeekBar.setMax(maxIterationsOld);
+				setMaxIterations(maxIterationsOld);
+				setLegacyRenderMode(RenderMode.SINGLE_IN_VERTEX);
 				break;
 			case R.id.radioEDV:
 				/*if(allowDouble[0] == -1) {
@@ -1084,25 +1100,25 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 					showWarning();
 					break;
 				}*/
-				renderMode = RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX;
-				iterSeekBar.setMax(maxIterationsOld);
+				setMaxIterations(maxIterationsOld);
+				setLegacyRenderMode(RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX);
 				break;
 			case R.id.radio32F:
+				setMaxIterations(maxIterations);
 				renderMode = RenderMode.FLOAT_TEXTURE;
-				iterSeekBar.setMax(maxIterations);
+				fullRedraw();
 				break;
 			case R.id.radio64F:
+				setMaxIterations(maxIterations);
 				renderMode = RenderMode.FLOAT_TEXTURE_EMULATED_DOUBLE;
-				iterSeekBar.setMax(maxIterations);
+				fullRedraw();
 				break;
 			default:
-				renderMode = RenderMode.SINGLE;
-				iterSeekBar.setMax(maxIterationsOld);
+				setMaxIterations(maxIterationsOld);
+				setLegacyRenderMode(RenderMode.SINGLE);
 				break;
 			}
-			
-			fullRedraw();
-			
+
 		} else if(arg0.getId() == R.id.colorRadioGroup) {
 			
 			switch(arg0.getCheckedRadioButtonId()) {
@@ -1124,6 +1140,19 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			}
 			
 			loadShaders(colorShader);
+			fullRedraw();
+		}
+	}
+
+	private void setLegacyRenderMode(RenderMode renderMode) {
+		if(allowLegacy[0] != 1 && (this.renderMode == RenderMode.FLOAT_TEXTURE || this.renderMode == RenderMode.FLOAT_TEXTURE_EMULATED_DOUBLE)) {
+			showLegacyWarning(renderMode);
+		}
+		else {
+			this.renderMode = renderMode;
+			setMaxIterations(maxIterationsOld);
+			this.renderMode = renderMode;
+			setRenderMode(renderMode);
 			fullRedraw();
 		}
 	}
@@ -1178,7 +1207,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		setScaleMandelUniform(scale);
 		renderMode = RenderMode.SINGLE;
 		setRenderMode(renderMode);
-		maxInterationsUniform.set(200);
+		maxInterationsUniform.set(hasFloatBuffers ? 32 * 1024 : 200);
 		((SeekBar)findViewById(R.id.iterSeekBar)).setProgress(
 				(int) maxInterationsUniform.getFloats()[0]);
 		
@@ -1350,13 +1379,15 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				}
 				else {
 					if(renderMode != RenderMode.FLOAT_TEXTURE) {
-						runOnUiThread(new Runnable() {
-							@Override
-							public void run() {
-								Toast.makeText(Mandel.this, "Auto-switching to 32 bit precision",
-										Toast.LENGTH_SHORT).show();
-							}
-						});
+						if(renderMode != RenderMode.SINGLE) {
+							runOnUiThread(new Runnable() {
+								@Override
+								public void run() {
+									Toast.makeText(Mandel.this, "Auto-switching to 32 bit precision",
+											Toast.LENGTH_SHORT).show();
+								}
+							});
+						}
 						renderMode = RenderMode.FLOAT_TEXTURE;
 						fullRedraw();
 					}
@@ -1367,16 +1398,16 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 			}
 			
 			// TODO: Doesn't work!! Wrong value from preferences.
-			if(!getSharedPreferences("MANDEL", 0).getBoolean("allowDouble", false));
-				if(scale*w/W < vertexSingleLimit) {
-					if(allowDouble[0] == -1) {
+			if(!getSharedPreferences("MANDEL", 0).getBoolean("allowDouble", false)) {
+				if (scale * w / W < vertexSingleLimit) {
+					if (allowDouble[0] == -1) {
 						allowDouble[0] = 0;
 						showWarning();
-					}
-					else if(allowDouble[0] == 0) {
+					} else if (allowDouble[0] == 0) {
 						vertexSingleLimit = 0;
 					}
 				}
+			}
 			
 			if(scale*w/W < vertexSingleLimit) {
 				// We need double precision
@@ -1628,6 +1659,35 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		            	rememberDoubleChoice(false);
 		            	
 		            	dialog.dismiss();
+		       }
+		   });
+		AlertDialog alert = builder.create();
+		alert.show();
+    }
+
+	public void showLegacyWarning(final RenderMode renderMode) {
+		AlertDialog.Builder builder = new AlertDialog.Builder(this);
+		final boolean[] checkSet = {false};
+		builder.setTitle("Warning")
+			.setMessage("Would you like to switch to legacy experimental mode?\n\n" +
+				"It is unstable and the OpenGL ES 3 mode you are currently in is superiour in every way.")
+		   .setCancelable(true)
+		   .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+		       public void onClick(DialogInterface dialog, int id) {
+				allowLegacy[0] = 1;
+				iterSeekBar.setMax(maxIterationsOld);
+				Mandel.this.renderMode = renderMode;
+				setRenderMode(renderMode);
+				fullRedraw();
+
+				dialog.dismiss();
+		       }
+		   })
+		   .setNegativeButton("No", new DialogInterface.OnClickListener() {
+		       public void onClick(DialogInterface dialog, int id) {
+				allowLegacy[0] = 0;
+
+				dialog.dismiss();
 		       }
 		   });
 		AlertDialog alert = builder.create();

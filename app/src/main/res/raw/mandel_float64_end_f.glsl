@@ -27,8 +27,10 @@ void main()
 	vec2 radius2 = add(mul(z.xy,z.xy), mul(z.zw,z.zw));
 	float endIter = iteration.x + iteration.y;
 
-	if(i == uint(endIter) && i < uint(MAX_ITER))
-		discard;
+	if(i == uint(endIter) && i < uint(MAX_ITER)) {
+		outColor = vec4(0., 0., 0., endIter / MAX_ITER);
+		return;
+	}
 
 	float speed2 = (i == uint(MAX_ITER) ? 0.0 : float(i));
 
