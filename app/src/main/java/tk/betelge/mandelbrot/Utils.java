@@ -58,7 +58,8 @@ public class Utils {
 			ContentValues contentValues = new ContentValues();
 			contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, "mandelbrot_" + date + ".png");
 			contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "image/png");
-			contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES);
+			contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES
+					+ File.separator + "Fractals");
 			contentValues.put(MediaStore.MediaColumns.IS_PENDING, true);
 			Uri imageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues);
 			try {

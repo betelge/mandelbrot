@@ -156,6 +156,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 
 	private SeekBar iterSeekBar;
 	final private int maxIterationsOld = 1024, maxIterations = 1024 * 128;
+
+	private RadioGroup renderModeRadioGroup;
 	
 	static public enum RenderMode {
 		SINGLE(0x001),
@@ -296,7 +298,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		gradBar.setOnSeekBarChangeListener(this);
 				
 		View tempView = findViewById(R.id.linearLayout);
-		RadioGroup renderModeRadioGroup = (RadioGroup)tempView.findViewById(R.id.renderModeRadioGroup);
+		renderModeRadioGroup = (RadioGroup)tempView.findViewById(R.id.renderModeRadioGroup);
 		renderModeRadioGroup.setOnCheckedChangeListener(this);
 		RadioGroup colorRadioGroup = (RadioGroup)tempView.findViewById(R.id.colorRadioGroup);
 		colorRadioGroup.setOnCheckedChangeListener(this);
@@ -1079,19 +1081,15 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				fullRedraw();
 				break;
 			case R.id.radioS:
-				setMaxIterations(maxIterationsOld);
 				setLegacyRenderMode(RenderMode.SINGLE);
 				break;
 			case R.id.radioED:
-				setMaxIterations(maxIterationsOld);
 				setLegacyRenderMode(RenderMode.EMULATED_DOUBLE);
 				break;
 			case R.id.radioExpED:
-				setMaxIterations(maxIterationsOld);
 				setLegacyRenderMode(RenderMode.EXP_EMULATED_DOUBLE);
 		        break;
 			case R.id.radioSV:
-				setMaxIterations(maxIterationsOld);
 				setLegacyRenderMode(RenderMode.SINGLE_IN_VERTEX);
 				break;
 			case R.id.radioEDV:
@@ -1100,7 +1098,6 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 					showWarning();
 					break;
 				}*/
-				setMaxIterations(maxIterationsOld);
 				setLegacyRenderMode(RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX);
 				break;
 			case R.id.radio32F:
@@ -1114,7 +1111,6 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				fullRedraw();
 				break;
 			default:
-				setMaxIterations(maxIterationsOld);
 				setLegacyRenderMode(RenderMode.SINGLE);
 				break;
 			}
@@ -1145,7 +1141,10 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	}
 
 	private void setLegacyRenderMode(RenderMode renderMode) {
-		if(allowLegacy[0] != 1 && (this.renderMode == RenderMode.FLOAT_TEXTURE || this.renderMode == RenderMode.FLOAT_TEXTURE_EMULATED_DOUBLE)) {
+		if(allowLegacy[0] == -2) {
+			// ignore for radio set check bug work around
+		}
+		else if(allowLegacy[0] != 1 && (this.renderMode == RenderMode.FLOAT_TEXTURE || this.renderMode == RenderMode.FLOAT_TEXTURE_EMULATED_DOUBLE)) {
 			showLegacyWarning(renderMode);
 		}
 		else {
@@ -1675,7 +1674,7 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		   .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
 		       public void onClick(DialogInterface dialog, int id) {
 				allowLegacy[0] = 1;
-				iterSeekBar.setMax(maxIterationsOld);
+				setMaxIterations(maxIterationsOld);
 				Mandel.this.renderMode = renderMode;
 				setRenderMode(renderMode);
 				fullRedraw();
@@ -1684,10 +1683,13 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 		       }
 		   })
 		   .setNegativeButton("No", new DialogInterface.OnClickListener() {
-		       public void onClick(DialogInterface dialog, int id) {
-				allowLegacy[0] = 0;
+				public void onClick(DialogInterface dialog, int id) {
+					allowLegacy[0] = -2;
 
-				dialog.dismiss();
+					renderModeRadioGroup.check(R.id.radioA);
+					allowLegacy[0] = 0;
+
+					dialog.dismiss();
 		       }
 		   });
 		AlertDialog alert = builder.create();
