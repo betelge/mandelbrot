@@ -528,6 +528,10 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 
 	@Override
 	public void onSurfaceChanged(int w, int h) {
+
+		// TODO: This runs on GL thread but should run on main thread !
+
+
 		if(w == 0 || h == 0) return;
 		
 		// This will be done first after the view receives it's size in the layout.
