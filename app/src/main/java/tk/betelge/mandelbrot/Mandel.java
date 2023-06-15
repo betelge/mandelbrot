@@ -1024,8 +1024,8 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 
 	@Override
 	public void onProgressChanged(SeekBar arg0, int arg1, boolean arg2) {
-		switch(arg0.getId()){
-		case R.id.iterSeekBar:
+		int id = arg0.getId();
+		if (id == R.id.iterSeekBar) {
 			TextView iterText = (TextView)findViewById(R.id.iterTextView);
 			iterText.setText("Iterations: " + arg0.getProgress());
 			
@@ -1035,13 +1035,9 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 				maxInterationsUniform.set(arg0.getProgress());
 				mandelPass.setSilent(false);
 			}*/
-			break;
-		case R.id.gradBar:
+		} else if (id == R.id.gradBar) {
 			TextView gradText = (TextView)findViewById(R.id.gradText);
 			gradText.setText("Gradient: " + gradFunc(arg0.getProgress()));
-			break;
-		default:
-			break;
 		}
 	}
 
@@ -1072,71 +1068,54 @@ CheckGlErrorPass.OnGlErrorListener, RenderPass.OnRenderPassFinishedListener {
 	}
 
 	@Override
-	public void onCheckedChanged(RadioGroup arg0, int arg1) {
-		if(arg0.getId() == R.id.renderModeRadioGroup) {
+	public void onCheckedChanged(RadioGroup group, int checkedId) {
+		if(group.getId() == R.id.renderModeRadioGroup) {
 			
-			if(arg0.getCheckedRadioButtonId() != R.id.radioA)
+			if(checkedId != R.id.radioA)
 				((RadioButton)findViewById(R.id.radioA)).setText("Auto");
-		
-			switch(arg0.getCheckedRadioButtonId()) {
-			case R.id.radioA:
+
+			if (checkedId == R.id.radioA) {
 				setMaxIterations(hasFloatBuffers ? maxIterations : maxIterationsOld);
 				setAutoMode();
 				fullRedraw();
-				break;
-			case R.id.radioS:
+			} else if (checkedId == R.id.radioS) {
 				setLegacyRenderMode(RenderMode.SINGLE);
-				break;
-			case R.id.radioED:
+			} else if (checkedId == R.id.radioED) {
 				setLegacyRenderMode(RenderMode.EMULATED_DOUBLE);
-				break;
-			case R.id.radioExpED:
+			} else if (checkedId == R.id.radioExpED) {
 				setLegacyRenderMode(RenderMode.EXP_EMULATED_DOUBLE);
-		        break;
-			case R.id.radioSV:
+			} else if (checkedId == R.id.radioSV) {
 				setLegacyRenderMode(RenderMode.SINGLE_IN_VERTEX);
-				break;
-			case R.id.radioEDV:
-				/*if(allowDouble[0] == -1) {
+			} else if (checkedId == R.id.radioEDV) {/*if(allowDouble[0] == -1) {
 					allowDouble[0] = 0;
 					showWarning();
 					break;
 				}*/
 				setLegacyRenderMode(RenderMode.EXP_EMULATED_DOUBLE_IN_VERTEX);
-				break;
-			case R.id.radio32F:
+			} else if (checkedId == R.id.radio32F) {
 				setMaxIterations(maxIterations);
 				renderMode = RenderMode.FLOAT_TEXTURE;
 				fullRedraw();
-				break;
-			case R.id.radio64F:
+			} else if (checkedId == R.id.radio64F) {
 				setMaxIterations(maxIterations);
 				renderMode = RenderMode.FLOAT_TEXTURE_EMULATED_DOUBLE;
 				fullRedraw();
-				break;
-			default:
+			} else {
 				setLegacyRenderMode(RenderMode.SINGLE);
-				break;
 			}
 
-		} else if(arg0.getId() == R.id.colorRadioGroup) {
-			
-			switch(arg0.getCheckedRadioButtonId()) {
-			case R.id.huecircleRadio:
+		} else if(group.getId() == R.id.colorRadioGroup) {
+
+			if (checkedId == R.id.huecircleRadio) {
 				colorShader = R.raw.hsvcolor;
-				break;
-			case R.id.blueyellowRadio:
+			} else if (checkedId == R.id.blueyellowRadio) {
 				colorShader = R.raw.blueyellowcolor;
-				break;
-			case R.id.pastelhsvRadio:
+			} else if (checkedId == R.id.pastelhsvRadio) {
 				colorShader = R.raw.pastelhsvcolor;
-				break;
-			case R.id.gradientRadio:
+			} else if (checkedId == R.id.gradientRadio) {
 				colorShader = R.raw.gradientcolor;
-				break;
-			default:
+			} else {
 				colorShader = R.raw.pastelhsvcolor;
-				break;
 			}
 			
 			loadShaders(colorShader);
