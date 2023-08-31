@@ -41,11 +41,11 @@ public class Utils {
 	}
 	
 	public static void displayFileError(Activity activity) {
-		Toast.makeText(activity, "Can't write image to SD card", Toast.LENGTH_LONG).show();
+		Toast.makeText(activity, "Can't write image to gallery", Toast.LENGTH_LONG).show();
 	}
 	
 	public static void displaySuccesToast(Activity activity) {
-		Toast.makeText(activity, "Image saved to SD card", Toast.LENGTH_SHORT).show();
+		Toast.makeText(activity, "Image saved to gallery", Toast.LENGTH_SHORT).show();
 	}
 	
 	public static Bitmap saveBitmapToFile(Activity activity, Bitmap bitmap) {
